@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PsalmHero – Mette (C‑Dur) – Import-Version</title>
+  <style>
+    :root{ --bg:#f6f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --ok:#16a34a; --hi:#ea580c; --lo:#2563eb; --rail:#e5e7eb }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
+    .wrap{max-width:960px;margin:0 auto;padding:16px}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{appearance:none;border:1px solid #e5e7eb;background:#111827;color:#fff;border-radius:14px;padding:10px 14px;font-weight:600}
+    button.secondary{background:#fff;color:var(--ink)}
+    button.ghost{background:#fff;color:var(--ink);border-style:dashed}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
+    @media(min-width:900px){.grid{grid-template-columns:2fr 1fr}}
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;padding:16px}
+    .title{margin:0 0 10px 0;font-size:18px}
+    .row{display:flex;justify-content:space-between;align-items:baseline;margin:8px 0}
+    .muted{color:var(--muted);font-size:13px}
+    .bar{height:10px;background:var(--rail);border-radius:999px;overflow:hidden}
+    .bar>div{height:100%;width:0}
+    .syll{display:inline-block;padding:8px 12px;border-radius:14px;border:1px solid #e5e7eb;background:#fff;margin:6px 6px 0 0}
+    .syll.active{background:#000;color:#fff;border-color:#000}
+    .inputs label{display:block;font-size:13px;margin:8px 0 4px}
+    input[type="range"], select{width:100%}
+    input[type="text"], input[type="number"]{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px}
+    .partrow{display:grid;grid-template-columns:1fr auto;gap:8px;width:100%}
+    canvas{display:block;width:100%;height:260px;background:#0b1220;border-radius:14px;border:1px solid #1f2a44}
+    .legend{display:flex;justify-content:space-between;align-items:center;margin:6px 0 0;color:#94a3b8;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <button type="button" onclick="return PS_play();">▶️ Play</button>
+      <button type="button" class="secondary" onclick="return PS_stop();">⏹️ Stop</button>
+      <button type="button" class="ghost" onclick="return PS_mic();">🎙️ Mikro an</button>
+      <button type="button" class="ghost" onclick="return PS_test();">🔊 Test‑Ton</button>
+      <span id="status" class="muted" style="margin-left:8px"></span>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2 class="title">Live‑Übung</h2>
+        <canvas id="highway" width="800" height="260"></canvas>
+        <div class="legend"><span>Noten‑Highway</span><span>Treff‑Linie ▲</span></div>
+        <div class="row"><div class="muted">Zielnote</div><div id="targetNote">–</div></div>
+        <div class="row"><div class="muted">Erkannte Note</div><div id="detectedNote">–</div></div>
+        <div class="bar" aria-label="Abweichungsbalken"><div id="devBar"></div></div>
+        <div class="muted" id="devText" style="margin-top:6px">Abweichung: –</div>
+        <div id="syllWrap" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="title">Mette‑Teile & Einstellungen</h3>
+        <div class="inputs">
+          <label>Teil auswählen</label>
+          <div class="partrow">
+            <select id="part">
+              <option value="invitatorium_antiphon">Invitatorium – Antiphon</option>
+              <option value="invitatorium_psalmvers">Invitatorium – Psalmvers</option>
+              <option value="eroeffnung">Eröffnung (Versikel/Antwort)</option>
+              <option value="responsorium">Responsorium kurz</option>
+              <option value="benedictus_antiphon">Benedictus – Antiphon</option>
+              <option value="vaterunser">Vaterunser (Antwortton)</option>
+              <option value="segen">Segen (kurz)</option>
+            </select>
+            <button type="button" class="secondary" onclick="return PS_load();">Laden</button>
+          </div>
+
+          <label><input type="checkbox" id="showNotation" checked /> Notenbild auf Notenlinien anzeigen</label>
+
+          <label>Guide‑Lautstärke</label>
+          <input type="range" id="gain" min="0" max="0.8" step="0.02" value="0.2" oninput="PS_gain(this.value)" />
+
+          <label>Tempo: <span id="bpmVal">70</span> BPM</label>
+          <input type="range" id="bpm" min="40" max="120" step="1" value="70" oninput="PS_bpm(this.value)" />
+
+          <label>Silben (mit | trennen)</label>
+          <input type="text" id="sylText" value="Kommt|lasst|uns|anbeten~" />
+          <div class="muted">Dauer: Suffix ~ = 2 Schläge, ^ = 3 Schläge (z. B. „Herr~“).</div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input type="number" id="rootNum" value="60" />
+            <button type="button" class="secondary" style="flex:1" onclick="return PS_rebuild();">Neu aufbauen</button>
+          </div>
+          <div style="margin-top:8px">
+            <label><input type="checkbox" id="psalmMode" /> Psalmton‑Modus (Rezitation + Kadenz)</label>
+          </div>
+
+          <hr style="margin:16px 0; border:none; border-top:1px solid #e5e7eb" />
+          <strong>Privater Import (MusicXML/CSV)</strong>
+          <div class="muted">Nur für Unterricht / nicht-öffentliche Nutzung. Verarbeitung erfolgt lokal im Browser.</div>
+
+          <label style="margin-top:8px">MusicXML (.xml/.musicxml)</label>
+          <input type="file" id="xmlFile" accept=".xml,.musicxml" />
+          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+            <button type="button" class="secondary" onclick="return PS_importXML();">XML laden</button>
+            <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="xmlUseLyrics" checked /> Liedtext aus XML verwenden</label>
+          </div>
+
+          <label style="margin-top:12px">CSV / Text (pro Zeile: <code>midi,duration_in_beats,syllable</code>)</label>
+          <textarea id="csvText" rows="5" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px" placeholder="60,1,Ehre&#10;62,1,sei&#10;64,2,dem~"></textarea>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button type="button" class="secondary" onclick="return PS_importCSV();">CSV übernehmen</button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <strong>Hinweise</strong>
+      <ul>
+        <li>Funktioniert im Handy‑Browser. Mikrofon benötigt <em>HTTPS</em> und Freigabe.</li>
+        <li>iOS: Audio startet nach Button‑Klick (Safari‑Policy).</li>
+        <li><strong>Urheberrecht:</strong> EG‑Inhalte sind geschützt. Nutze den Import nur für nicht‑öffentliche Nutzung.</li>
+      </ul>
+    </div>
+  </div>
+
+<script>
+  // ==== Utils & Pitch ====
+  const A4=440, rootDefault=60; // C4
+  const midiToFreq = m => A4*Math.pow(2,(m-69)/12);
+  const freqToMidi = f => Math.round(69 + 12*Math.log2(f/A4));
+  const midiToName = m => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][m%12] + (Math.floor(m/12)-1);
+  const SCALE_MAJOR=[0,2,4,5,7,9,11];
+
+  const $=id=>document.getElementById(id);
+  const targetNoteEl=$('targetNote'), detectedNoteEl=$('detectedNote'), devBarEl=$('devBar'), devTextEl=$('devText'), syllWrapEl=$('syllWrap');
+  const canvas=$('highway'); const g=canvas.getContext('2d');
+  const view={w:canvas.width,h:canvas.height,pxPerBeat:90,hitX:110};
+
+  let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let timer=null; let playStartMs=0; let songBeat=0; let lastMs=0; let highwayCache=[]; let lastFreq=null; let lastCents=null; let listening=false;
+
+  function renderSyll(){ try{ if(!syllWrapEl) return; syllWrapEl.innerHTML=''; syllables.forEach((s,i)=>{ const span=document.createElement('span'); span.className='syll'+(i===currentIdx?' active':''); span.textContent=s.text; span.title=`Soll: ${midiToName(s.midi)} (${midiToFreq(s.midi).toFixed(1)} Hz)`; syllWrapEl.appendChild(span); }); }catch(e){console.warn(e);} }
+
+  // Audio
+  let ctx=null, masterGain=null; function ensureAudio(){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)(); masterGain=ctx.createGain(); masterGain.gain.value=gainVal; masterGain.connect(ctx.destination); } }
+  function playGuide(freq, durMs){ ensureAudio(); const gnode=ctx.createGain(); const osc=ctx.createOscillator(); osc.type='sine'; osc.frequency.value=freq; osc.connect(gnode); gnode.connect(masterGain); const now=ctx.currentTime,a=0.01,r=0.08; gnode.gain.setValueAtTime(0,now); gnode.gain.linearRampToValueAtTime(1,now+a); gnode.gain.setTargetAtTime(0, now + durMs/1000 - r, r); osc.start(now); osc.stop(now + durMs/1000 + 0.02); }
+
+  // Mic + pitch
+  let micStream=null, analyser=null, micBuf=null, rafId=null;
+  function autoCorrelateFloat32(buf){ const SIZE=buf.length; let rms=0; for(let i=0;i<SIZE;i++) rms+=buf[i]*buf[i]; rms=Math.sqrt(rms/SIZE); if(rms<0.01) return null; let r1=0,r2=SIZE-1,th=0.2; for(let i=0;i<SIZE/2;i++){ if(Math.abs(buf[i])<th){r1=i;break;} } for(let i=1;i<SIZE/2;i++){ if(Math.abs(buf[SIZE-i])<th){r2=SIZE-i;break;} } buf=buf.slice(r1,r2); const N=buf.length; const ac=new Float32Array(N); for(let lag=0; lag<N; lag++){ let sum=0; for(let i=0;i<N-lag;i++) sum+=buf[i]*buf[i+lag]; ac[lag]=sum; } let d=0; while(d<N && ac[d]>ac[d+1]) d++; let maxPos=d,maxVal=-1; for(let i=d;i<N;i++){ if(ac[i]>maxVal){maxVal=ac[i]; maxPos=i;} } if(maxPos===0) return null; const x1=ac[maxPos-1]||0, x2=ac[maxPos], x3=ac[maxPos+1]||0; const shift=(x3-x1)/(2*(2*x2-x1-x3)); const period=(maxPos+shift); const f=(ctx?ctx.sampleRate:48000)/period; if(f<60||f>1000) return null; return f; }
+
+  // Parts (Platzhalter)
+  const PARTS={
+    eroeffnung:{ title:'Eröffnung (Versikel/Antwort)', text:'Herr|öffne|meine|Lippen~|dass|mein|Mund|dein|Lob|verkündige~', degrees:[0,2,4,4,4,5,4,2,0,0] },
+    invitatorium_antiphon:{ title:'Invitatorium – Antiphon', text:'Kommt|lasst|uns|anbeten~', degrees:[0,0,2,0] },
+    invitatorium_psalmvers:{ title:'Invitatorium – Psalmvers (Psalmton)', text:'Kommt|lasst|uns|mit|Frohlocken|dem|HERRN|zujauchzen~', mode:'psalmtone' },
+    responsorium:{ title:'Responsorium kurz', text:'Singet|dem|HERRN|ein|neues|Lied~', degrees:[0,2,4,5,4,2] },
+    benedictus_antiphon:{ title:'Benedictus – Antiphon', text:'Gepriesen|sei|der|Herr|der|Gott|Israels~', degrees:[0,0,2,4,5,4,2] },
+    vaterunser:{ title:'Vaterunser (Antwortton)', text:'Vater|unser|im|Himmel|geheiligt|werde|dein|Name~', mode:'psalmtone' },
+    segen:{ title:'Segen (kurz)', text:'Der|Herr|segne|und|behüte|dich~', degrees:[0,2,4,4,2,0] }
+  };
+
+  function buildPsalmToneDegrees(n){ const scale=SCALE_MAJOR; const dom=4; const line=new Array(Math.max(1,n)).fill(scale[dom]); if(n>=3){ line[n-3]=Math.max(0,scale[dom]-1); line[n-2]=scale[dom]+1; line[n-1]=scale[dom]; } return line; }
+  function makeNotesFromSyllables(list){ return list.map(s=>({...s, dur: s.text.endsWith('~')?2:(s.text.endsWith('^')?3:1)})); }
+
+  function buildFromText(){ const raw=$('sylText').value; const parts=raw.split('|').map(s=>s.trim()).filter(Boolean); const base=parseInt($('rootNum').value||rootDefault,10); let degrees = $('psalmMode').checked? buildPsalmToneDegrees(parts.length) : SCALE_MAJOR; const out=parts.map((p,i)=>({ text:p, midi: base + ($('psalmMode').checked? degrees[i] : degrees[i%degrees.length]) })); syllables=makeNotesFromSyllables(out); currentIdx=0; updateTarget(); buildHighwayCache(); renderSyll(); }
+  function loadPart(key){ const part=PARTS[key]; if(!part) throw new Error('Teil nicht gefunden'); $('sylText').value=part.text; $('psalmMode').checked = part.mode==='psalmtone'; buildFromTextWithDegrees(part); }
+  function buildFromTextWithDegrees(part){ const pieces=part.text.split('|').map(s=>s.trim()).filter(Boolean); const base=parseInt($('rootNum').value||rootDefault,10); let degs = part.mode==='psalmtone'? buildPsalmToneDegrees(pieces.length) : (part.degrees||SCALE_MAJOR); syllables = makeNotesFromSyllables(pieces.map((p,i)=>({ text:p, midi: base + (part.mode==='psalmtone'? degs[i] : degs[i%degs.length]) })) ); currentIdx=0; updateTarget(); buildHighwayCache(); renderSyll(); }
+
+  // Import
+  function importCSV(text){ const rows=text.split(/\\n+/).map(r=>r.trim()).filter(Boolean); const items=[]; for(const r of rows){ const m=r.match(/^\\s*(\\d+)\\s*,\\s*([0-9]*\\.?[0-9]+)\\s*,\\s*(.+)\\s*$/); if(!m) continue; const midi=parseInt(m[1],10); const dur=parseFloat(m[2]); const syll=m[3]; items.push({ text:syll, midi, dur }); } if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); } }
+  function importMusicXML(xmlText, useLyrics){ const dom=new DOMParser().parseFromString(xmlText,'application/xml'); const divisions=parseInt(dom.querySelector('divisions')?.textContent||'1',10)||1; const notes=Array.from(dom.querySelectorAll('note')); const items=[]; for(const n of notes){ if(n.querySelector('rest')) continue; const step=n.querySelector('pitch>step')?.textContent||'C'; const alter=parseInt(n.querySelector('pitch>alter')?.textContent||'0',10)||0; const oct=parseInt(n.querySelector('pitch>octave')?.textContent||'4',10)||4; const durTicks=parseFloat(n.querySelector('duration')?.textContent||'1'); const beats=durTicks/divisions; const midi=stepToMidi(step,alter,oct); let syll='•'; if(useLyrics){ const l=n.querySelector('lyric text'); if(l && l.textContent) syll=l.textContent; } items.push({ text:syll, midi, dur:Math.max(0.25,beats) }); } if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); } }
+  function stepToMidi(step, alter, octave){ const map={C:0,D:2,E:4,F:5,G:7,A:9,B:11}; const base=map[step?.toUpperCase?.()||'C']; return 12*(octave+1) + base + (alter||0); }
+
+  // Highway timing/render
+  let totalBeats=0;
+  function buildHighwayCache(){ let t=0; highwayCache = syllables.map(s=>({ ...s, startBeat:t, heldSec:0, complete:false })); syllables.forEach(s=>{ t += s.dur||1; }); totalBeats=t; }
+  function midiToY(m){ const rangeTop = 72; const rangeBottom = 48; const y=(1-(m-rangeBottom)/(rangeTop-rangeBottom))*(canvas.height-20)+10; return y; }
+  function drawHighway(now){ if(lastMs===0) lastMs=now; const dt=(now-lastMs)/1000; lastMs=now; if(playing){ songBeat=((now-playStartMs)/1000)*(bpm/60); } const w=canvas.width, h=canvas.height, px=view.pxPerBeat, hitX=view.hitX; const ctx2=g; ctx2.clearRect(0,0,w,h); ctx2.fillStyle='#0b1220'; ctx2.fillRect(0,0,w,h); if($('showNotation').checked){ ctx2.strokeStyle='#172036'; ctx2.lineWidth=1; [76,74,72,71,69].forEach(m=>{ const y=midiToY(m); ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(w,y); ctx2.stroke(); }); } ctx2.strokeStyle='#1f2a44'; for(let i=0;i<16;i++){ const x=w - i*px; ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,h); ctx2.stroke(); } ctx2.strokeStyle='#94a3b8'; ctx2.beginPath(); ctx2.moveTo(hitX,0); ctx2.lineTo(hitX,h); ctx2.stroke(); let active=null; highwayCache.forEach(n=>{ const rel=n.startBeat - songBeat; const x=w - rel*px; const wid=(n.dur||1)*px*0.95; const y=midiToY(n.midi); const nh=14; if(x+wid<0 || x>w) return; ctx2.fillStyle='#334155'; ctx2.fillRect(x,y-nh/2,wid,nh); const need=(n.dur||1)*60/bpm; const ratio=Math.min(1,n.heldSec/need); if(ratio>0){ ctx2.fillStyle='rgba(34,197,94,0.9)'; ctx2.fillRect(x,y-nh/2,wid*ratio,nh);} if(n.complete){ ctx2.strokeStyle='#16a34a'; ctx2.lineWidth=2; ctx2.strokeRect(x+0.5,y-nh/2+0.5,wid-1,nh-1);} if($('showNotation').checked){ ctx2.fillStyle='#e5e7eb'; const cx=x+8; ctx2.save(); ctx2.translate(cx,y); ctx2.rotate(-0.3); ctx2.beginPath(); ctx2.ellipse(0,0,10,7,0,0,Math.PI*2); ctx2.fill(); ctx2.restore(); } if(!active && x<=hitX && hitX<=x+wid) active={n, need}; }); if(active){ if(lastCents!=null && Math.abs(lastCents)<=30){ active.n.heldSec += dt; if(active.n.heldSec>=active.need) active.n.complete=true; } } if(lastFreq){ const y=midiToY(freqToMidi(lastFreq)); ctx2.fillStyle='#eab308'; ctx2.beginPath(); ctx2.arc(w-8,y,5,0,Math.PI*2); ctx2.fill(); } }
+  function animate(now){ drawHighway(now||performance.now()); if(playing) requestAnimationFrame(animate); }
+
+  // Public button handlers (Wix-sicher)
+  function PS_status(msg){ const s=$('status'); if(s) s.textContent=msg||''; }
+  function PS_play(){ try{ ensureAudio(); playing=true; playStartMs=performance.now(); songBeat=0; lastMs=0; currentIdx=0; tick(); timer=setInterval(tick, Math.max(120,60000/bpm)); requestAnimationFrame(animate); PS_status('Playing…'); return false; }catch(e){ console.error(e); alert('Play fehlgeschlagen: '+e.message); return false; } }
+  function PS_stop(){ try{ playing=false; if(timer) clearInterval(timer); PS_status(''); return false; }catch(e){ console.error(e); return false; } }
+  function PS_test(){ try{ ensureAudio(); playGuide(midiToFreq(60),400); PS_status('Testton (C4)'); setTimeout(()=>PS_status(''),600); return false; }catch(e){ console.error(e); return false; } }
+  function PS_mic(){ try{ if(listening) stopListening(); else { ensureAudio(); startListening(); } PS_status(listening?'Mikro aktiv':''); return false; }catch(e){ console.error(e); alert('Mikro konnte nicht gestartet werden.'); return false; } }
+  function PS_load(){ try{ const key=$('part').value; loadPart(key); PS_status('Teil geladen: '+(PARTS[key]?.title||key)); setTimeout(()=>PS_status(''),1200); return false; }catch(e){ console.error(e); alert('Fehler beim Laden des Teils: '+e.message); return false; } }
+  function PS_gain(v){ try{ gainVal=parseFloat(v); ensureAudio(); masterGain.gain.value=gainVal; }catch(e){} }
+  function PS_bpm(v){ bpm=parseInt(v,10)||70; $('bpmVal').textContent=bpm; }
+  function PS_rebuild(){ try{ buildFromText(); PS_status('Neu aufgebaut'); setTimeout(()=>PS_status(''),800); return false; }catch(e){ console.error(e); alert('Neuaufbau fehlgeschlagen: '+e.message); return false; } }
+  function PS_importXML(){ try{ const f=$('xmlFile').files && $('xmlFile').files[0]; if(!f){ alert('Bitte eine MusicXML-Datei wählen (.xml/.musicxml).'); return false; } const reader=new FileReader(); reader.onload=(ev)=>{ try{ importMusicXML(ev.target.result, $('xmlUseLyrics').checked); PS_status('MusicXML geladen'); setTimeout(()=>PS_status(''),1200); } catch(e){ console.error(e); alert('Konnte XML nicht lesen: '+e.message); } }; reader.readAsText(f); return false; }catch(e){ console.error(e); alert('Fehler beim XML-Import.'); return false; } }
+  function PS_importCSV(){ try{ const txt=$('csvText').value.trim(); if(!txt){ alert('CSV/Textfeld ist leer.'); return false; } importCSV(txt); PS_status('CSV übernommen'); setTimeout(()=>PS_status(''),900); return false; } catch(e){ console.error(e); alert('Fehler beim CSV-Import.'); return false; } }
+
+  function tick(){ const s=syllables[currentIdx]; if(!s) return; const freq=midiToFreq(s.midi); playGuide(freq, Math.max(100, 60000/bpm*0.9)); currentIdx=(currentIdx+1)%syllables.length; updateTarget(); renderSyll(); }
+  function updateTarget(){ const s=syllables[currentIdx]||syllables[0]; if(!s){ targetNoteEl.textContent='–'; return; } targetNoteEl.textContent=midiToName(s.midi)+' ('+midiToFreq(s.midi).toFixed(1)+' Hz)'; }
+
+  function startListening(){ navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(stream=>{ micStream=stream; const src=ctx.createMediaStreamSource(stream); analyser=ctx.createAnalyser(); analyser.fftSize=2048; src.connect(analyser); micBuf=new Float32Array(analyser.fftSize); listening=true; const loop=()=>{ analyser.getFloatTimeDomainData(micBuf); const f=autoCorrelateFloat32(micBuf); updateDetected(f); rafId=requestAnimationFrame(loop); }; loop(); }).catch(e=>{ alert('Mikrofonzugriff fehlgeschlagen – bitte HTTPS & Rechte prüfen.'); console.error(e); }); }
+  function stopListening(){ listening=false; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
+  function updateDetected(freq){ if(!freq){ lastFreq=null; lastCents=null; detectedNoteEl.textContent='–'; devTextEl.textContent='Abweichung: –'; devBarEl.style.width='0%'; devBarEl.style.background='#d1d5db'; return; }
+    lastFreq=freq; const target=syllables[currentIdx]? midiToFreq(syllables[currentIdx].midi):(syllables[0]?midiToFreq(syllables[0].midi):null); const midi=freqToMidi(freq); detectedNoteEl.textContent=`${midiToName(midi)} (${freq.toFixed(1)} Hz)`; if(target){ const cents=1200*Math.log2(freq/target); lastCents=cents; devTextEl.textContent=`Abweichung: ${cents.toFixed(0)} Cent`; const w=Math.min(100, Math.abs(cents)/50*100); devBarEl.style.width=w+'%'; devBarEl.style.background=Math.abs(cents)<=30?'var(--ok)':(cents>30?'var(--hi)':'var(--lo)'); } }
+
+  // Boot
+  (function boot(){ try{ $('sylText').value=PARTS.invitatorium_antiphon.text; loadPart('invitatorium_antiphon'); PS_status('Bereit'); }catch(e){ console.error(e); PS_status('Fehler beim Start: '+e.message); } })();
+</script>
+</body>
+</html>
