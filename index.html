@@ -163,13 +163,31 @@
 
     // ====== Audio ======
     let ctx = null, masterGain = null;
-    function ensureAudio(){ if(!ctx){ ctx = new (window.AudioContext||window.webkitAudioContext)(); masterGain = ctx.createGain(); masterGain.gain.value = gainVal; masterGain.connect(ctx.destination); } }
-    function playGuide(freq, durMs){ ensureAudio(); const gnode = ctx.createGain(); const osc = ctx.createOscillator(); osc.type='sine'; osc.frequency.value=freq; osc.connect(gnode); gnode.connect(masterGain); const now=ctx.currentTime, a=0.01, r=0.08; gnode.gain.setValueAtTime(0,now); gnode.gain.linearRampToValueAtTime(1,now+a); gnode.gain.setTargetAtTime(0, now + durMs/1000 - r, r); osc.start(now); osc.stop(now + durMs/1000 + 0.02); }
+    function ensureAudio(){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)(); masterGain=ctx.createGain(); masterGain.gain.value=gainVal; masterGain.connect(ctx.destination); } }
+
+    // Mobile/iOS unlock helpers
+    let audioUnlocked=false;
+    function unlockAudioThen(run){
+      try{ ensureAudio(); }catch(_){/* noop */}
+      const proceed=()=>{ audioUnlocked=true; if(typeof run==='function') run(); };
+      if(!ctx){ proceed(); return; }
+      if(ctx.state==='running'){ proceed(); return; }
+      ctx.resume().then(()=>{
+        try{ // prime with a silent buffer
+          const b=ctx.createBuffer(1,1,ctx.sampleRate); const src=ctx.createBufferSource(); src.buffer=b; src.connect(masterGain); src.start(0);
+        }catch(_){/* ignore */}
+        setTimeout(proceed,0);
+      }).catch(()=> setTimeout(proceed,0));
+    }
+    document.addEventListener('touchstart', ()=> unlockAudioThen(), {once:true, passive:true});
+    document.addEventListener('mousedown', ()=> unlockAudioThen(), {once:true});
+
+    function playGuide(freq, durMs){ ensureAudio(); const gnode=ctx.createGain(); const osc=ctx.createOscillator(); osc.type='sine'; osc.frequency.value=freq; osc.connect(gnode); gnode.connect(masterGain); const now=ctx.currentTime,a=0.01,r=0.08; gnode.gain.setValueAtTime(0,now); gnode.gain.linearRampToValueAtTime(1,now+a); gnode.gain.setTargetAtTime(0, now + durMs/1000 - r, r); osc.start(now); osc.stop(now + durMs/1000 + 0.02); }(freq, durMs){ ensureAudio(); const gnode = ctx.createGain(); const osc = ctx.createOscillator(); osc.type='sine'; osc.frequency.value=freq; osc.connect(gnode); gnode.connect(masterGain); const now=ctx.currentTime, a=0.01, r=0.08; gnode.gain.setValueAtTime(0,now); gnode.gain.linearRampToValueAtTime(1,now+a); gnode.gain.setTargetAtTime(0, now + durMs/1000 - r, r); osc.start(now); osc.stop(now + durMs/1000 + 0.02); }
 
     // ====== Pitch Detection (Autokorrelation) ======
     let micStream=null, analyser=null, micBuf=null, rafId=null; let lastFreq=null, lastCents=null;
     function autoCorrelateFloat32(buf){ const SIZE=buf.length; let rms=0; for(let i=0;i<SIZE;i++) rms+=buf[i]*buf[i]; rms=Math.sqrt(rms/SIZE); if(rms<0.01) return null; let r1=0,r2=SIZE-1,th=0.2; for(let i=0;i<SIZE/2;i++){ if(Math.abs(buf[i])<th){r1=i;break;} } for(let i=1;i<SIZE/2;i++){ if(Math.abs(buf[SIZE-i])<th){r2=SIZE-i;break;} } buf=buf.slice(r1,r2); const N=buf.length; const ac=new Float32Array(N); for(let lag=0; lag<N; lag++){ let sum=0; for(let i=0;i<N-lag;i++) sum+=buf[i]*buf[i+lag]; ac[lag]=sum; } let d=0; while(d<N && ac[d]>ac[d+1]) d++; let maxPos=d,maxVal=-1; for(let i=d;i<N;i++){ if(ac[i]>maxVal){maxVal=ac[i]; maxPos=i;} } if(maxPos===0) return null; const x1=ac[maxPos-1]||0, x2=ac[maxPos], x3=ac[maxPos+1]||0; const shift=(x3-x1)/(2*(2*x2-x1-x3)); const period=(maxPos+shift); const f=(ctx?ctx.sampleRate:48000)/period; if(f<60||f>1000) return null; return f; }
-    function startListening(){ if(listening) return; ensureAudio(); navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(stream=>{ micStream=stream; const src=ctx.createMediaStreamSource(stream); analyser=ctx.createAnalyser(); analyser.fftSize=2048; src.connect(analyser); micBuf=new Float32Array(analyser.fftSize); listening=true; $('btnMic').textContent='🎙️ Mikro aus'; const loop=()=>{ analyser.getFloatTimeDomainData(micBuf); const f=autoCorrelateFloat32(micBuf); updateDetected(f); rafId=requestAnimationFrame(loop); }; loop(); }).catch(e=>{ alert('Mikrofonzugriff fehlgeschlagen – bitte Berechtigungen & HTTPS prüfen.'); console.error(e); }); }
+    function startListening(){ if(!audioUnlocked){ unlockAudioThen(()=> startListening()); return; } if(listening) return; ensureAudio(); navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(stream=>{ micStream=stream; const src=ctx.createMediaStreamSource(stream); analyser=ctx.createAnalyser(); analyser.fftSize=2048; src.connect(analyser); micBuf=new Float32Array(analyser.fftSize); listening=true; $('btnMic').textContent='🎙️ Mikro aus'; const loop=()=>{ analyser.getFloatTimeDomainData(micBuf); const f=autoCorrelateFloat32(micBuf); updateDetected(f); rafId=requestAnimationFrame(loop); }; loop(); }).catch(e=>{ alert('Mikrofonzugriff fehlgeschlagen – bitte Berechtigungen & HTTPS prüfen.'); console.error(e); }); }
     function stopListening(){ listening=false; $('btnMic').textContent='🎙️ Mikro an'; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
 
     // ====== Psalmton-Generator (C-Dur) ======
@@ -266,10 +284,10 @@
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && playing){ requestAnimationFrame(animate); } });
 
     // ====== Global fallback handlers (for restrictive embeds) ======
-    window.PS_play = function(){ try{ ensureAudio(); start(); const s=$('status'); if(s) s.textContent='Playing…'; return false; } catch(e){ console.error(e); alert('Play fehlgeschlagen: '+e.message); return false; } };
+    window.PS_play = function(){ try{ unlockAudioThen(()=>{ start(); const s=$('status'); if(s) s.textContent='Playing…'; }); return false; } catch(e){ console.error(e); alert('Play fehlgeschlagen: '+e.message); return false; } }; 
     window.PS_stop = function(){ try{ stop(); const s=$('status'); if(s) s.textContent=''; return false; } catch(e){ console.error(e); return false; } };
     window.PS_mic = function(){ try{ if(listening){ stopListening(); } else { ensureAudio(); startListening(); } const s=$('status'); if(s) s.textContent = listening ? 'Mikro aktiv' : ''; return false; } catch(e){ console.error(e); alert('Mikro konnte nicht gestartet werden.'); return false; } };
-    window.PS_test = function(){ try{ ensureAudio(); playGuide(midiToFreq(60), 400); const s=$('status'); if(s) s.textContent='Testton (C4)'; setTimeout(()=>{ if($('status')) $('status').textContent=''; }, 600); return false; } catch(e){ console.error(e); return false; } };
+    window.PS_test = function(){ try{ unlockAudioThen(()=>{ playGuide(midiToFreq(60), 400); const s=$('status'); if(s) s.textContent='Testton (C4)'; setTimeout(()=>{ if($('status')) $('status').textContent=''; }, 600); }); return false; } catch(e){ console.error(e); return false; } }; 
     window.PS_load = function(){ try{ const key=$('part').value; if(!PARTS[key]){ alert('Teil nicht gefunden: '+key); return false; } loadPart(key); const s=$('status'); if(s) s.textContent='Teil geladen: '+(PARTS[key]?.title||key); setTimeout(()=>{ if($('status')) $('status').textContent=''; }, 1200); return false; } catch(e){ console.error(e); alert('Fehler beim Laden des Teils.'); return false; } };
 
     // ====== UI wiring ======
@@ -317,4 +335,3 @@
   </script>
 </body>
 </html>
-
