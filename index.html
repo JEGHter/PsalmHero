@@ -72,7 +72,7 @@
           <label>Tempo: <span id="bpmVal">70</span> BPM</label>
           <input type="range" id="bpm" min="40" max="120" step="1" value="70" oninput="PS_bpm(this.value)" />
 
-          <label>Silben-Vorschau</label>
+          <label>Silben‑Vorschau</label>
           <input type="text" id="sylText" value="" readonly />
         </div>
       </div>
@@ -90,7 +90,7 @@
 
 <script>
   // ===== Utils =====
-  const A4=440, rootDefault=60; // C4
+  const A4=440; // Referenz
   const midiToFreq = m => A4*Math.pow(2,(m-69)/12);
   const freqToMidi = f => Math.round(69 + 12*Math.log2(f/A4));
   const midiToName = m => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][m%12] + (Math.floor(m/12)-1);
@@ -120,15 +120,16 @@
   function stopListening(){ listening=false; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
 
   // ===== Data & State =====
-  let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let timer=null; let playStartMs=0; let songBeat=0; let lastMs=0; let highwayCache=[];
+  let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let noteTimer=null; let playStartMs=0; let songBeat=0; let lastMs=0; let highwayCache=[];
 
   // ===== MusicXML import (no UI) =====
   function stepToMidi(step, alter, octave){ const map={C:0,D:2,E:4,F:5,G:7,A:9,B:11,H:11}; const base=map[step?.toUpperCase?.()||'C']; return 12*(octave+1) + base + (alter||0); }
   function importMusicXML(xmlText, useLyrics){ const dom=new DOMParser().parseFromString(xmlText,'application/xml'); const divisions=parseFloat(dom.querySelector('divisions')?.textContent||'1')||1; const notes=Array.from(dom.querySelectorAll('note')); const items=[]; for(const n of notes){ if(n.querySelector('rest')) continue; const step=n.querySelector('pitch>step')?.textContent||'C'; const alter=parseInt(n.querySelector('pitch>alter')?.textContent||'0',10)||0; const oct=parseInt(n.querySelector('pitch>octave')?.textContent||'4',10)||4; const durTicks=parseFloat(n.querySelector('duration')?.textContent||'1'); const beats=durTicks/divisions; const midi=stepToMidi(step,alter,oct); let syll='•'; if(useLyrics!==false){ const l=n.querySelector('lyric text'); if(l && l.textContent) syll=l.textContent; } items.push({ text:syll, midi, dur:Math.max(0.25,beats) }); }
-    if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); $('sylText').value = items.map(x=>x.text).join('|'); } }
+    if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); $('sylText').value = items.map(x=>x.text).join('|'); }
+  }
 
   // ===== Highway timing & render =====
-  function buildHighwayCache(){ let t=0; highwayCache = syllables.map(s=>({ ...s, startBeat:t, heldSec:0, complete:false })); syllables.forEach(s=>{ t += s.dur||1; }); }
+  function buildHighwayCache(){ let t=0; highwayCache = syllables.map(s=>({ ...s, startBeat:t, heldSec:0, complete:false })); syllables.forEach(s=>{ t += (s.dur||1); }); }
   function midiToY(m){ const rangeTop = 72; const rangeBottom = 48; return (1-(m-rangeBottom)/(rangeTop-rangeBottom))*(canvas.height-20)+10; }
   function drawHighway(now){ if(lastMs===0) lastMs=now; const dt=(now-lastMs)/1000; lastMs=now; if(playing){ songBeat=((now-playStartMs)/1000)*(bpm/60); }
     const w=canvas.width, h=canvas.height, px=view.pxPerBeat, hitX=view.hitX; const ctx2=g; ctx2.clearRect(0,0,w,h); ctx2.fillStyle='#0b1220'; ctx2.fillRect(0,0,w,h);
@@ -146,17 +147,32 @@
   function renderSyll(){ syllWrapEl.innerHTML=''; syllables.forEach((s,i)=>{ const span=document.createElement('span'); span.className='syll'+(i===currentIdx?' active':''); span.textContent=s.text; span.title=`Soll: ${midiToName(s.midi)} (${midiToFreq(s.midi).toFixed(1)} Hz)`; syllWrapEl.appendChild(span); }); }
   function updateTarget(){ const s=syllables[currentIdx]||syllables[0]; if(!s){ targetNoteEl.textContent='–'; return; } targetNoteEl.textContent=midiToName(s.midi)+' ('+midiToFreq(s.midi).toFixed(1)+' Hz)'; }
 
+  // ===== Variable‑Dauer Playback (pro Note)
+  function scheduleNextNote(){
+    if(!playing || !syllables.length) return;
+    const s = syllables[currentIdx];
+    updateTarget();
+    renderSyll();
+    const beatMs = 60000 / bpm;
+    const playMs = Math.max(100, (s.dur || 1) * beatMs * 0.95);
+    playGuide(midiToFreq(s.midi), playMs);
+    const wait = Math.max(20, (s.dur || 1) * beatMs);
+    if(noteTimer) clearTimeout(noteTimer);
+    noteTimer = setTimeout(()=>{
+      currentIdx = (currentIdx + 1) % syllables.length;
+      scheduleNextNote();
+    }, wait);
+  }
+
   // ===== Controls =====
   function PS_status(msg){ const s=$('status'); if(s) s.textContent=msg||''; }
-  function PS_play(){ unlockAudioThen(()=>{ if(playing||syllables.length===0){ /* keep state */ } playing=true; playStartMs=performance.now(); songBeat=0; lastMs=0; currentIdx=0; tick(); if(timer) clearInterval(timer); timer=setInterval(tick, Math.max(120,60000/bpm)); requestAnimationFrame(animate); PS_status('Playing…'); }); return false; }
-  function PS_stop(){ playing=false; if(timer) clearInterval(timer); PS_status(''); return false; }
+  function PS_play(){ unlockAudioThen(()=>{ if(!syllables.length){ return; } playing=true; playStartMs=performance.now(); songBeat=0; lastMs=0; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); requestAnimationFrame(animate); PS_status('Playing…'); }); return false; }
+  function PS_stop(){ playing=false; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } PS_status(''); return false; }
   function PS_test(){ unlockAudioThen(()=>{ playGuide(midiToFreq(60),400); PS_status('Testton (C4)'); setTimeout(()=>PS_status(''),700); }); return false; }
   function PS_mic(){ if(listening){ stopListening(); PS_status(''); } else { unlockAudioThen(()=>{ startListening(); PS_status('Mikro aktiv'); }); } return false; }
   function PS_gain(v){ gainVal=parseFloat(v); ensureAudio(); masterGain.gain.value=gainVal; }
-  function PS_bpm(v){ bpm=parseInt(v,10)||70; $('bpmVal').textContent=bpm; }
+  function PS_bpm(v){ bpm=parseInt(v,10)||70; $('bpmVal').textContent=bpm; if(playing){ if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); } }
   function PS_load(){ try{ const key=$('part').value; loadPart(key); return false; }catch(e){ alert('Fehler beim Laden: '+e.message); return false; } }
-  function tick(){ const s=syllables[currentIdx]; if(!s) return; const freq=midiToFreq(s.midi); playGuide(freq, Math.max(100, 60000/bpm*0.9)); currentIdx=(currentIdx+1)%syllables.length; updateTarget(); renderSyll(); }
-  function updateDetected(freq){ if(!freq){ lastFreq=null; lastCents=null; detectedNoteEl.textContent='–'; devTextEl.textContent='Abweichung: –'; devBarEl.style.width='0%'; devBarEl.style.background='#d1d5db'; return; } lastFreq=freq; const target=syllables[currentIdx]? midiToFreq(syllables[currentIdx].midi):(syllables[0]?midiToFreq(syllables[0].midi):null); const midi=freqToMidi(freq); detectedNoteEl.textContent=`${midiToName(midi)} (${freq.toFixed(1)} Hz)`; if(target){ const cents=1200*Math.log2(freq/target); lastCents=cents; devTextEl.textContent=`Abweichung: ${cents.toFixed(0)} Cent`; const w=Math.min(100, Math.abs(cents)/50*100); devBarEl.style.width=w+'%'; devBarEl.style.background=Math.abs(cents)<=30?'var(--ok)':(cents>30?'var(--hi)':'var(--lo)'); } }
 
   // ===== External parts index =====
   const PART_INDEX = {
