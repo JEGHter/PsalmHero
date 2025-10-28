@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>PsalmHero – Mette (Public Build)</title>
+  <title>PsalmHero – Mette (Wix‑Embed Ready)</title>
   <style>
     :root{ --bg:#f6f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --ok:#16a34a; --hi:#ea580c; --lo:#2563eb; --rail:#e5e7eb }
     *{box-sizing:border-box}
@@ -30,6 +30,8 @@
     .partrow{display:grid;grid-template-columns:1fr auto;gap:8px;width:100%}
     canvas{display:block;width:100%;height:300px;background:#0b1220;border-radius:14px;border:1px solid #1f2a44}
     .legend{display:flex;justify-content:space-between;align-items:center;margin:6px 0 0;color:#94a3b8;font-size:12px}
+    .warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;border-radius:12px;padding:10px 12px;font-size:14px}
+    .warn strong{font-weight:700}
     @media(max-width:640px){button{font-size:17px;padding:14px 20px} canvas{height:320px}}
   </style>
 </head>
@@ -41,6 +43,13 @@
       <button type="button" class="ghost" onclick="return PS_mic();">🎙️ Mikro an</button>
       <button type="button" class="ghost" onclick="return PS_test();">🔊 Test‑Ton</button>
       <span id="status" class="muted" style="margin-left:8px"></span>
+      <span id="embedHint" class="muted" style="margin-left:auto"></span>
+    </div>
+
+    <div id="iframeWarn" class="warn" style="display:none;margin-bottom:12px">
+      <strong>Mikrofon im eingebetteten Modus nicht verfügbar.</strong>
+      Dieser Bereich wurde wahrscheinlich in einem iFrame ohne Mikro‑Rechte geladen. 
+      Öffne die App <a id="openNewTab" href="#" target="_blank" rel="noopener">in einem neuen Tab</a> oder erlaube dem iFrame <code>allow="microphone"</code>.
     </div>
 
     <div class="grid">
@@ -81,9 +90,9 @@
     <div class="card" style="margin-top:16px">
       <strong>Hinweise</strong>
       <ul>
-        <li>Funktioniert im Handy‑Browser. Mikrofon benötigt <em>HTTPS</em> und Freigabe.</li>
-        <li>iOS blockiert Audio bis zum ersten Tap – die Seite schaltet es automatisch frei.</li>
-        <li>Material wird direkt von <code>/parts/*.musicxml</code> geladen (GitHub Pages).</li>
+        <li>Handy‑Browser: Mikrofon benötigt <em>HTTPS</em> und Freigabe.</li>
+        <li>iOS: Audio startet erst nach dem ersten Tap – wird automatisch freigeschaltet.</li>
+        <li>Teile werden aus <code>/parts/*.musicxml</code> geladen (GitHub Pages).</li>
       </ul>
     </div>
   </div>
@@ -95,6 +104,16 @@
   const freqToMidi = f => Math.round(69 + 12*Math.log2(f/A4));
   const midiToName = m => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][m%12] + (Math.floor(m/12)-1);
   const $=id=>document.getElementById(id);
+
+  // iFrame‑Erkennung & Hinweis
+  const inIframe = (()=>{ try { return window.self !== window.top; } catch(e){ return true; } })();
+  window.addEventListener('DOMContentLoaded', ()=>{
+    $('openNewTab').href = window.location.href;
+    if(inIframe){
+      $('iframeWarn').style.display = 'block';
+      $('embedHint').textContent = 'eingebettet';
+    }
+  });
 
   // ===== DOM refs =====
   const targetNoteEl=$('targetNote'), detectedNoteEl=$('detectedNote'), devBarEl=$('devBar'), devTextEl=$('devText'), syllWrapEl=$('syllWrap');
@@ -116,14 +135,46 @@
   // ===== Pitch detection =====
   let micStream=null, analyser=null, micBuf=null, rafId=null, lastFreq=null, lastCents=null, listening=false;
   function autoCorrelateFloat32(buf){ const SIZE=buf.length; let rms=0; for(let i=0;i<SIZE;i++) rms+=buf[i]*buf[i]; rms=Math.sqrt(rms/SIZE); if(rms<0.01) return null; let r1=0,r2=SIZE-1,th=0.2; for(let i=0;i<SIZE/2;i++){ if(Math.abs(buf[i])<th){r1=i;break;} } for(let i=1;i<SIZE/2;i++){ if(Math.abs(buf[SIZE-i])<th){r2=SIZE-i;break;} } buf=buf.slice(r1,r2); const N=buf.length; const ac=new Float32Array(N); for(let lag=0; lag<N; lag++){ let sum=0; for(let i=0;i<N-lag;i++) sum+=buf[i]*buf[i+lag]; ac[lag]=sum; } let d=0; while(d<N && ac[d]>ac[d+1]) d++; let maxPos=d,maxVal=-1; for(let i=d;i<N;i++){ if(ac[i]>maxVal){maxVal=ac[i]; maxPos=i;} } if(maxPos===0) return null; const x1=ac[maxPos-1]||0, x2=ac[maxPos], x3=ac[maxPos+1]||0; const shift=(x3-x1)/(2*(2*x2-x1-x3)); const period=(maxPos+shift); const f=(ctx?ctx.sampleRate:48000)/period; if(f<60||f>1000) return null; return f; }
-  function startListening(){ if(!audioUnlocked){ unlockAudioThen(()=> startListening()); return; } navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(stream=>{ micStream=stream; const src=ctx.createMediaStreamSource(stream); analyser=ctx.createAnalyser(); analyser.fftSize=2048; src.connect(analyser); micBuf=new Float32Array(analyser.fftSize); listening=true; const loop=()=>{ analyser.getFloatTimeDomainData(micBuf); const f=autoCorrelateFloat32(micBuf); updateDetected(f); rafId=requestAnimationFrame(loop); }; loop(); }).catch(e=>{ alert('Mikrofonzugriff fehlgeschlagen – bitte HTTPS & Rechte prüfen.'); console.error(e); }); }
+
+  // === DIAGNOSE‑Version: robuster getUserMedia + iFrame‑Hint ===
+  async function startListening(){
+    if(!audioUnlocked){ unlockAudioThen(()=> startListening()); return; }
+
+    // iFrame‑Hinweis, weil viele Wix‑Embeds kein "allow=microphone" setzen
+    if(inIframe){ $('iframeWarn').style.display='block'; }
+
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        try { const perm = await navigator.permissions.query({ name: 'microphone' }); console.log('[Mic] permission state:', perm.state); } catch(_){ }
+      }
+      try { const devs = await navigator.mediaDevices.enumerateDevices(); const mics = devs.filter(d=>d.kind==='audioinput'); console.log('[Mic] inputs:', mics); if(!mics.length){ alert('Kein Mikrofon gefunden. Bitte Gerät/OS prüfen.'); return; } } catch(_){ }
+
+      const constraints = { audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }, video:false };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      micStream = stream; ensureAudio(); const src=ctx.createMediaStreamSource(stream); analyser=ctx.createAnalyser(); analyser.fftSize=2048; src.connect(analyser); micBuf=new Float32Array(analyser.fftSize); listening=true; PS_status('Mikro aktiv');
+      const loop=()=>{ analyser.getFloatTimeDomainData(micBuf); const f=autoCorrelateFloat32(micBuf); updateDetected(f); rafId=requestAnimationFrame(loop); }; loop();
+    } catch (e) {
+      console.error('getUserMedia error:', e && e.name, e && e.message, e);
+      let tip='';
+      switch(e && e.name){
+        case 'NotFoundError': tip='Kein Mikrofon erkannt – bitte Gerät/OS prüfen.'; break;
+        case 'NotReadableError': tip='Mikrofon ist von einer anderen App belegt (Zoom/Teams/OBS?).'; break;
+        case 'NotAllowedError':
+        case 'SecurityError':
+          tip = inIframe ? 'Im iFrame ohne Mikro‑Rechte. Öffne die App im neuen Tab oder setze im Embed: allow="microphone".' : 'Berechtigung verweigert – Browser/OS‑Einstellungen prüfen.';
+          break;
+        case 'OverconstrainedError': tip='Audio‑Optionen nicht kompatibel. Anderen Browser testen.'; break;
+        default: tip='Bitte HTTPS, Browser‑/OS‑Rechte prüfen.';
+      }
+      alert(`Mikrofonzugriff fehlgeschlagen (${e && e.name || 'Fehler'}): ${e && e.message || ''}\n${tip}`);
+    }
+  }
+
   function stopListening(){ listening=false; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
 
   // ===== Data & State =====
   let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let noteTimer=null; // pro‑Note Timer
-  let songBeat=0; // Scrollposition in Beats
-  let lastAnimTs=0; // Zeitstempel für rAF‑Delta
-  let lastMs=0; let highwayCache=[];
+  let songBeat=0; let lastAnimTs=0; let highwayCache=[]; let lastFreq=null, lastCents=null;
 
   // ===== MusicXML import (no UI) =====
   function stepToMidi(step, alter, octave){ const map={C:0,D:2,E:4,F:5,G:7,A:9,B:11,H:11}; const base=map[step?.toUpperCase?.()||'C']; return 12*(octave+1) + base + (alter||0); }
@@ -140,20 +191,19 @@
     ctx2.strokeStyle='#1f2a44'; for(let i=0;i<16;i++){ const x=w - i*px; ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,h); ctx2.stroke(); }
     ctx2.strokeStyle='#94a3b8'; ctx2.beginPath(); ctx2.moveTo(hitX,0); ctx2.lineTo(hitX,h); ctx2.stroke();
     let active=null; highwayCache.forEach(n=>{ const rel=n.startBeat - songBeat; const x=w - rel*px; const wid=(n.dur||1)*px*0.95; const y=midiToY(n.midi); const nh=14; if(x+wid<0 || x>w) return; ctx2.fillStyle='#334155'; ctx2.fillRect(x,y-nh/2,wid,nh); const need=(n.dur||1)*60/bpm; const held=(n.heldSec||0); const ratio=Math.min(1, held/need); if(ratio>0){ ctx2.fillStyle='rgba(34,197,94,0.9)'; ctx2.fillRect(x,y-nh/2,wid*ratio,nh);} if(n.complete){ ctx2.strokeStyle='#16a34a'; ctx2.lineWidth=2; ctx2.strokeRect(x+0.5,y-nh/2+0.5,wid-1,nh-1);} if($('showNotation').checked){ ctx2.fillStyle='#e5e7eb'; const cx=x+8; ctx2.save(); ctx2.translate(cx,y); ctx2.rotate(-0.3); ctx2.beginPath(); ctx2.ellipse(0,0,10,7,0,0,Math.PI*2); ctx2.fill(); ctx2.restore(); } if(!active && x<=hitX && hitX<=x+wid) active={n, need:(n.dur||1)*60/bpm}; });
-    if(active){ if(lastCents!=null && Math.abs(lastCents)<=30){ active.n.heldSec = (active.n.heldSec||0) + (1/60); // grob pro Frame; exakter wäre dt, hier simpel
-      if(active.n.heldSec>=active.need) active.n.complete=true; } }
+    if(active){ if(lastCents!=null && Math.abs(lastCents)<=30){ active.n.heldSec = (active.n.heldSec||0) + (1/60); if(active.n.heldSec>=active.need) active.n.complete=true; } }
     if(lastFreq){ const y=midiToY(freqToMidi(lastFreq)); ctx2.fillStyle='#eab308'; ctx2.beginPath(); ctx2.arc(w-8,y,5,0,Math.PI*2); ctx2.fill(); }
   }
 
   function animate(now){
     if(!lastAnimTs) lastAnimTs = now;
-    const dt = (now - lastAnimTs) / 1000; // Sekunden seit letztem Frame
+    const dt = (now - lastAnimTs) / 1000; // s
     lastAnimTs = now;
     if(playing){ songBeat += dt * (bpm/60); }
     drawHighway(now);
     requestAnimationFrame(animate);
   }
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ lastAnimTs=0; } });
+  requestAnimationFrame(animate);
 
   // ===== UI helpers =====
   function renderSyll(){ syllWrapEl.innerHTML=''; syllables.forEach((s,i)=>{ const span=document.createElement('span'); span.className='syll'+(i===currentIdx?' active':''); span.textContent=s.text; span.title=`Soll: ${midiToName(s.midi)} (${midiToFreq(s.midi).toFixed(1)} Hz)`; syllWrapEl.appendChild(span); }); }
@@ -181,7 +231,7 @@
   function PS_play(){ unlockAudioThen(()=>{ if(!syllables.length){ return; } playing=true; lastAnimTs=0; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); PS_status('Playing…'); }); return false; }
   function PS_stop(){ playing=false; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } PS_status(''); return false; }
   function PS_test(){ unlockAudioThen(()=>{ playGuide(midiToFreq(60),400); PS_status('Testton (C4)'); setTimeout(()=>PS_status(''),700); }); return false; }
-  function PS_mic(){ if(listening){ stopListening(); PS_status(''); } else { unlockAudioThen(()=>{ startListening(); PS_status('Mikro aktiv'); }); } return false; }
+  function PS_mic(){ if(listening){ stopListening(); PS_status(''); } else { unlockAudioThen(()=>{ startListening(); }); } return false; }
   function PS_gain(v){ gainVal=parseFloat(v); ensureAudio(); masterGain.gain.value=gainVal; }
   function PS_bpm(v){ bpm=parseInt(v,10)||70; $('bpmVal').textContent=bpm; if(playing){ if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); } }
   function PS_load(){ try{ const key=$('part').value; loadPart(key); return false; }catch(e){ alert('Fehler beim Laden: '+e.message); return false; } }
@@ -204,7 +254,7 @@
 
   function fillPartSelect(){ const sel=$('part'); sel.innerHTML=''; Object.entries(PART_INDEX).forEach(([k,v])=>{ const opt=document.createElement('option'); opt.value=k; opt.textContent=v.title||k; sel.appendChild(opt); }); }
 
-  function init(){ sizeCanvas(); fillPartSelect(); const first=Object.keys(PART_INDEX)[0]; if(first){ $('part').value=first; loadPart(first); } requestAnimationFrame(animate); }
+  function init(){ sizeCanvas(); fillPartSelect(); const first=Object.keys(PART_INDEX)[0]; if(first){ $('part').value=first; loadPart(first); } }
 
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 </script>
