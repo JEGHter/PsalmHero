@@ -167,14 +167,14 @@
   function stopListening(){ listening=false; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
 
   // ===== Parts (placeholder) =====
-  const PARTS={
-    eroeffnung:{ title:"Eröffnung (Versikel/Antwort)", text:"Herr|öffne|meine|Lippen~|dass|mein|Mund|dein|Lob|verkündige~", degrees:[0,2,4,4,4,5,4,2,0,0] },
-    invitatorium_antiphon:{ title:"Invitatorium – Antiphon", text:"Kommt|lasst|uns|anbeten~", degrees:[0,0,2,0] },
-    invitatorium_psalmvers:{ title:"Invitatorium – Psalmvers (Psalmton)", text:"Kommt|lasst|uns|mit|Frohlocken|dem|HERRN|zujauchzen~", mode:'psalmtone' },
-    responsorium:{ title:"Responsorium kurz", text:"Singet|dem|HERRN|ein|neues|Lied~", degrees:[0,2,4,5,4,2] },
-    benedictus_antiphon:{ title:"Benedictus – Antiphon", text:"Gepriesen|sei|der|Herr|der|Gott|Israels~", degrees:[0,0,2,4,5,4,2] },
-    vaterunser:{ title:"Vaterunser (Antwortton)", text:"Vater|unser|im|Himmel|geheiligt|werde|dein|Name~", mode:'psalmtone' },
-    segen:{ title:"Segen (kurz)", text:"Der|Herr|segne|und|behüte|dich~", degrees:[0,2,4,4,2,0] }
+  const PART_INDEX = {
+    invitatorium_antiphon: { title: "Invitatorium – Antiphon", url: "parts/invitatorium_antiphon.musicxml", type: "xml" },
+    invitatorium_psalmvers:{ title: "Invitatorium – Psalmvers (Psalmton)", url: "parts/invitatorium_psalmvers.musicxml", type: "xml" },
+    eroeffnung:            { title: "Eröffnung (Versikel/Antwort)", url: "parts/eroeffnung.musicxml", type: "xml" },
+    responsorium:          { title: "Responsorium kurz", url: "parts/responsorium_kurz.musicxml", type: "xml" },
+    benedictus_antiphon:   { title: "Benedictus – Antiphon", url: "parts/benedictus_antiphon.musicxml", type: "xml" },
+    vaterunser:            { title: "Vaterunser (Antwortton)", url: "parts/vaterunser_antwortton.musicxml", type: "xml" },
+    segen:                 { title: "Segen (kurz)", url: "parts/segen_kurz.musicxml", type: "xml" }
   };
 
   // ===== Build notes =====
