@@ -191,6 +191,12 @@
 					<text>auf</text>
 				</lyric>
 			</note>
+			<note>
+				<rest/>
+				<duration>480</duration>
+				<voice>1</voice>
+				<type>quarter</type>
+			</note>
 		</measure>
 		<measure number="3">
 			<print new-system="yes">
@@ -341,6 +347,12 @@
 					<text>ige</text>
 				</lyric>
 			</note>
+			<note>
+				<rest/>
+				<duration>480</duration>
+				<voice>1</voice>
+				<type>quarter</type>
+			</note>
 		</measure>
 		<measure number="5">
 			<print new-system="yes">
@@ -490,6 +502,12 @@
 					<text>de</text>
 				</lyric>
 			</note>
+			<note>
+				<rest/>
+				<duration>480</duration>
+				<voice>1</voice>
+				<type>quarter</type>
+			</note>
 		</measure>
 		<measure number="7">
 			<print new-system="yes">
@@ -509,6 +527,10 @@
 				<duration>480</duration>
 				<voice>1</voice>
 				<type>quarter</type>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>Herr</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -519,6 +541,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">begin</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>er</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -529,6 +555,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">end</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>hoe</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -539,6 +569,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">begin</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>re</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -549,6 +583,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">continue</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>mich</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -559,6 +597,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">continue</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>mit</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -569,6 +611,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">end</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>dei</text>
+				</lyric>
 			</note>
 		</measure>
 		<measure number="8">
@@ -581,6 +627,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">begin</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>ner</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -591,6 +641,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">continue</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>treu</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -601,6 +655,10 @@
 				<voice>1</voice>
 				<type>eighth</type>
 				<beam number="1">end</beam>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>en</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
@@ -611,12 +669,26 @@
 				<duration>480</duration>
 				<voice>1</voice>
 				<type>quarter</type>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>Hil</text>
+				</lyric>
 			</note>
 			<note>
 				<pitch>
 					<step>G</step>
 					<octave>4</octave>
 				</pitch>
+				<duration>480</duration>
+				<voice>1</voice>
+				<type>quarter</type>
+				<lyric default-y="-65" number="1">
+					<syllabic>single</syllabic>
+					<text>fe</text>
+				</lyric>
+			</note>
+			<note>
+				<rest/>
 				<duration>480</duration>
 				<voice>1</voice>
 				<type>quarter</type>
@@ -871,6 +943,12 @@
 					<syllabic>single</syllabic>
 					<text>ste</text>
 				</lyric>
+			</note>
+			<note>
+				<rest/>
+				<duration>480</duration>
+				<voice>1</voice>
+				<type>quarter</type>
 			</note>
 		</measure>
 		<measure number="12">
@@ -1137,6 +1215,12 @@
 					<syllabic>single</syllabic>
 					<text>men</text>
 				</lyric>
+			</note>
+			<note>
+				<rest/>
+				<duration>480</duration>
+				<voice>1</voice>
+				<type>quarter</type>
 			</note>
 		</measure>
 		<measure number="15">
