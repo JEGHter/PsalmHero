@@ -120,28 +120,40 @@
   function stopListening(){ listening=false; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
 
   // ===== Data & State =====
-  let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let noteTimer=null; let playStartMs=0; let songBeat=0; let lastMs=0; let highwayCache=[];
+  let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let noteTimer=null; // pro‑Note Timer
+  let songBeat=0; // Scrollposition in Beats
+  let lastAnimTs=0; // Zeitstempel für rAF‑Delta
+  let lastMs=0; let highwayCache=[];
 
   // ===== MusicXML import (no UI) =====
   function stepToMidi(step, alter, octave){ const map={C:0,D:2,E:4,F:5,G:7,A:9,B:11,H:11}; const base=map[step?.toUpperCase?.()||'C']; return 12*(octave+1) + base + (alter||0); }
   function importMusicXML(xmlText, useLyrics){ const dom=new DOMParser().parseFromString(xmlText,'application/xml'); const divisions=parseFloat(dom.querySelector('divisions')?.textContent||'1')||1; const notes=Array.from(dom.querySelectorAll('note')); const items=[]; for(const n of notes){ if(n.querySelector('rest')) continue; const step=n.querySelector('pitch>step')?.textContent||'C'; const alter=parseInt(n.querySelector('pitch>alter')?.textContent||'0',10)||0; const oct=parseInt(n.querySelector('pitch>octave')?.textContent||'4',10)||4; const durTicks=parseFloat(n.querySelector('duration')?.textContent||'1'); const beats=durTicks/divisions; const midi=stepToMidi(step,alter,oct); let syll='•'; if(useLyrics!==false){ const l=n.querySelector('lyric text'); if(l && l.textContent) syll=l.textContent; } items.push({ text:syll, midi, dur:Math.max(0.25,beats) }); }
-    if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); $('sylText').value = items.map(x=>x.text).join('|'); }
+    if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); $('sylText').value = items.map(x=>x.text).join('|'); songBeat=0; lastAnimTs=0; }
   }
 
   // ===== Highway timing & render =====
   function buildHighwayCache(){ let t=0; highwayCache = syllables.map(s=>({ ...s, startBeat:t, heldSec:0, complete:false })); syllables.forEach(s=>{ t += (s.dur||1); }); }
   function midiToY(m){ const rangeTop = 72; const rangeBottom = 48; return (1-(m-rangeBottom)/(rangeTop-rangeBottom))*(canvas.height-20)+10; }
-  function drawHighway(now){ if(lastMs===0) lastMs=now; const dt=(now-lastMs)/1000; lastMs=now; if(playing){ songBeat=((now-playStartMs)/1000)*(bpm/60); }
+  function drawHighway(now){
     const w=canvas.width, h=canvas.height, px=view.pxPerBeat, hitX=view.hitX; const ctx2=g; ctx2.clearRect(0,0,w,h); ctx2.fillStyle='#0b1220'; ctx2.fillRect(0,0,w,h);
     if($('showNotation').checked){ ctx2.strokeStyle='#172036'; ctx2.lineWidth=1; [76,74,72,71,69].forEach(m=>{ const y=midiToY(m); ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(w,y); ctx2.stroke(); }); }
     ctx2.strokeStyle='#1f2a44'; for(let i=0;i<16;i++){ const x=w - i*px; ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,h); ctx2.stroke(); }
     ctx2.strokeStyle='#94a3b8'; ctx2.beginPath(); ctx2.moveTo(hitX,0); ctx2.lineTo(hitX,h); ctx2.stroke();
-    let active=null; highwayCache.forEach(n=>{ const rel=n.startBeat - songBeat; const x=w - rel*px; const wid=(n.dur||1)*px*0.95; const y=midiToY(n.midi); const nh=14; if(x+wid<0 || x>w) return; ctx2.fillStyle='#334155'; ctx2.fillRect(x,y-nh/2,wid,nh); const need=(n.dur||1)*60/bpm; const ratio=Math.min(1,n.heldSec/need); if(ratio>0){ ctx2.fillStyle='rgba(34,197,94,0.9)'; ctx2.fillRect(x,y-nh/2,wid*ratio,nh);} if(n.complete){ ctx2.strokeStyle='#16a34a'; ctx2.lineWidth=2; ctx2.strokeRect(x+0.5,y-nh/2+0.5,wid-1,nh-1);} if($('showNotation').checked){ ctx2.fillStyle='#e5e7eb'; const cx=x+8; ctx2.save(); ctx2.translate(cx,y); ctx2.rotate(-0.3); ctx2.beginPath(); ctx2.ellipse(0,0,10,7,0,0,Math.PI*2); ctx2.fill(); ctx2.restore(); } if(!active && x<=hitX && hitX<=x+wid) active={n, need}; });
-    if(active){ if(lastCents!=null && Math.abs(lastCents)<=30){ active.n.heldSec += dt; if(active.n.heldSec>=active.need) active.n.complete=true; } }
+    let active=null; highwayCache.forEach(n=>{ const rel=n.startBeat - songBeat; const x=w - rel*px; const wid=(n.dur||1)*px*0.95; const y=midiToY(n.midi); const nh=14; if(x+wid<0 || x>w) return; ctx2.fillStyle='#334155'; ctx2.fillRect(x,y-nh/2,wid,nh); const need=(n.dur||1)*60/bpm; const held=(n.heldSec||0); const ratio=Math.min(1, held/need); if(ratio>0){ ctx2.fillStyle='rgba(34,197,94,0.9)'; ctx2.fillRect(x,y-nh/2,wid*ratio,nh);} if(n.complete){ ctx2.strokeStyle='#16a34a'; ctx2.lineWidth=2; ctx2.strokeRect(x+0.5,y-nh/2+0.5,wid-1,nh-1);} if($('showNotation').checked){ ctx2.fillStyle='#e5e7eb'; const cx=x+8; ctx2.save(); ctx2.translate(cx,y); ctx2.rotate(-0.3); ctx2.beginPath(); ctx2.ellipse(0,0,10,7,0,0,Math.PI*2); ctx2.fill(); ctx2.restore(); } if(!active && x<=hitX && hitX<=x+wid) active={n, need:(n.dur||1)*60/bpm}; });
+    if(active){ if(lastCents!=null && Math.abs(lastCents)<=30){ active.n.heldSec = (active.n.heldSec||0) + (1/60); // grob pro Frame; exakter wäre dt, hier simpel
+      if(active.n.heldSec>=active.need) active.n.complete=true; } }
     if(lastFreq){ const y=midiToY(freqToMidi(lastFreq)); ctx2.fillStyle='#eab308'; ctx2.beginPath(); ctx2.arc(w-8,y,5,0,Math.PI*2); ctx2.fill(); }
   }
-  function animate(now){ drawHighway(now||performance.now()); if(playing) requestAnimationFrame(animate); }
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && playing){ requestAnimationFrame(animate); } });
+
+  function animate(now){
+    if(!lastAnimTs) lastAnimTs = now;
+    const dt = (now - lastAnimTs) / 1000; // Sekunden seit letztem Frame
+    lastAnimTs = now;
+    if(playing){ songBeat += dt * (bpm/60); }
+    drawHighway(now);
+    requestAnimationFrame(animate);
+  }
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ lastAnimTs=0; } });
 
   // ===== UI helpers =====
   function renderSyll(){ syllWrapEl.innerHTML=''; syllables.forEach((s,i)=>{ const span=document.createElement('span'); span.className='syll'+(i===currentIdx?' active':''); span.textContent=s.text; span.title=`Soll: ${midiToName(s.midi)} (${midiToFreq(s.midi).toFixed(1)} Hz)`; syllWrapEl.appendChild(span); }); }
@@ -166,7 +178,7 @@
 
   // ===== Controls =====
   function PS_status(msg){ const s=$('status'); if(s) s.textContent=msg||''; }
-  function PS_play(){ unlockAudioThen(()=>{ if(!syllables.length){ return; } playing=true; playStartMs=performance.now(); songBeat=0; lastMs=0; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); requestAnimationFrame(animate); PS_status('Playing…'); }); return false; }
+  function PS_play(){ unlockAudioThen(()=>{ if(!syllables.length){ return; } playing=true; lastAnimTs=0; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); PS_status('Playing…'); }); return false; }
   function PS_stop(){ playing=false; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } PS_status(''); return false; }
   function PS_test(){ unlockAudioThen(()=>{ playGuide(midiToFreq(60),400); PS_status('Testton (C4)'); setTimeout(()=>PS_status(''),700); }); return false; }
   function PS_mic(){ if(listening){ stopListening(); PS_status(''); } else { unlockAudioThen(()=>{ startListening(); PS_status('Mikro aktiv'); }); } return false; }
@@ -185,7 +197,7 @@
     segen:                 { title: 'Segen (kurz)', url: 'parts/segen_kurz.musicxml', type: 'xml' }
   };
 
-  async function loadPart(key){ const entry=PART_INDEX[key]; if(!entry){ alert('Teil nicht gefunden: '+key); return; } try{ const res=await fetch(entry.url + '?v=' + Date.now()); if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(entry.type==='xml'){ importMusicXML(text, true); } else { const data=JSON.parse(text); syllables=data; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); }
+  async function loadPart(key){ const entry=PART_INDEX[key]; if(!entry){ alert('Teil nicht gefunden: '+key); return; } try{ const res=await fetch(entry.url + '?v=' + Date.now()); if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(entry.type==='xml'){ importMusicXML(text, true); } else { const data=JSON.parse(text); syllables=data; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); songBeat=0; lastAnimTs=0; }
       $('status').textContent='Teil geladen: ' + (entry.title||key); setTimeout(()=> $('status').textContent='', 1200);
     } catch(e){ console.error(e); alert('Konnte Teil nicht laden: '+e.message); }
   }
