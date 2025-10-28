@@ -4,12 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="robots" content="noindex,nofollow" />
-  <title>PsalmHero – Mette (C‑Dur) – STABLE</title>
+  <title>PsalmHero – Mette (Public Build)</title>
   <style>
     :root{ --bg:#f6f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --ok:#16a34a; --hi:#ea580c; --lo:#2563eb; --rail:#e5e7eb }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-    .wrap{max-width:960px;margin:0 auto;padding:16px}
+    .wrap{max-width:980px;margin:0 auto;padding:16px}
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     button{appearance:none;border:1px solid #e5e7eb;background:#111827;color:#fff;border-radius:16px;padding:12px 18px;font-weight:600;font-size:16px;line-height:1.2}
     button.secondary{background:#fff;color:var(--ink)}
@@ -26,11 +26,11 @@
     .syll.active{background:#000;color:#fff;border-color:#000}
     .inputs label{display:block;font-size:13px;margin:8px 0 4px}
     input[type="range"], select{width:100%}
-    input[type="text"], input[type="number"]{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px}
+    input[type="number"], input[type="text"]{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px}
     .partrow{display:grid;grid-template-columns:1fr auto;gap:8px;width:100%}
     canvas{display:block;width:100%;height:300px;background:#0b1220;border-radius:14px;border:1px solid #1f2a44}
     .legend{display:flex;justify-content:space-between;align-items:center;margin:6px 0 0;color:#94a3b8;font-size:12px}
-    @media(max-width:640px){ button{font-size:17px;padding:14px 20px} canvas{height:320px} }
+    @media(max-width:640px){button{font-size:17px;padding:14px 20px} canvas{height:320px}}
   </style>
 </head>
 <body>
@@ -60,15 +60,7 @@
         <div class="inputs">
           <label>Teil auswählen</label>
           <div class="partrow">
-            <select id="part">
-              <option value="invitatorium_antiphon">Invitatorium – Antiphon</option>
-              <option value="invitatorium_psalmvers">Invitatorium – Psalmvers</option>
-              <option value="eroeffnung">Eröffnung (Versikel/Antwort)</option>
-              <option value="responsorium">Responsorium kurz</option>
-              <option value="benedictus_antiphon">Benedictus – Antiphon</option>
-              <option value="vaterunser">Vaterunser (Antwortton)</option>
-              <option value="segen">Segen (kurz)</option>
-            </select>
+            <select id="part"></select>
             <button type="button" class="secondary" onclick="return PS_load();">Laden</button>
           </div>
 
@@ -80,16 +72,8 @@
           <label>Tempo: <span id="bpmVal">70</span> BPM</label>
           <input type="range" id="bpm" min="40" max="120" step="1" value="70" oninput="PS_bpm(this.value)" />
 
-          <label>Silben (mit | trennen)</label>
-          <input type="text" id="sylText" value="Kommt|lasst|uns|anbeten~" />
-          <div class="muted">Dauer: Suffix ~ = 2 Schläge, ^ = 3 Schläge (z. B. „Herr~“).</div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <input type="number" id="rootNum" value="60" />
-            <button type="button" class="secondary" style="flex:1" onclick="return PS_rebuild();">Neu aufbauen</button>
-          </div>
-          <div style="margin-top:8px">
-            <label><input type="checkbox" id="psalmMode" /> Psalmton‑Modus (Rezitation + Kadenz)</label>
-          </div>
+          <label>Silben-Vorschau</label>
+          <input type="text" id="sylText" value="" readonly />
         </div>
       </div>
     </div>
@@ -98,67 +82,36 @@
       <strong>Hinweise</strong>
       <ul>
         <li>Funktioniert im Handy‑Browser. Mikrofon benötigt <em>HTTPS</em> und Freigabe.</li>
-        <li>iOS: Audio muss nach dem ersten Tap freigeschaltet werden – das macht die Seite automatisch.</li>
+        <li>iOS blockiert Audio bis zum ersten Tap – die Seite schaltet es automatisch frei.</li>
+        <li>Material wird direkt von <code>/parts/*.musicxml</code> geladen (GitHub Pages).</li>
       </ul>
     </div>
   </div>
 
 <script>
   // ===== Utils =====
-  const A4=440;
+  const A4=440, rootDefault=60; // C4
   const midiToFreq = m => A4*Math.pow(2,(m-69)/12);
   const freqToMidi = f => Math.round(69 + 12*Math.log2(f/A4));
   const midiToName = m => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][m%12] + (Math.floor(m/12)-1);
-  const SCALE_MAJOR=[0,2,4,5,7,9,11];
   const $=id=>document.getElementById(id);
 
   // ===== DOM refs =====
   const targetNoteEl=$('targetNote'), detectedNoteEl=$('detectedNote'), devBarEl=$('devBar'), devTextEl=$('devText'), syllWrapEl=$('syllWrap');
   const canvas=$('highway'); const g=canvas.getContext('2d');
 
-  // Responsive sizing
+  // Responsive Canvas
   const view={w:0,h:0,pxPerBeat:90,hitX:110};
-  function sizeCanvas(){
-    const pr=window.devicePixelRatio||1;
-    const cssW=canvas.clientWidth||800;
-    const cssH=Math.max(260, Math.min(420, Math.round(cssW*0.36)));
-    canvas.width=Math.floor(cssW*pr);
-    canvas.height=Math.floor(cssH*pr);
-    canvas.style.height=cssH+'px';
-    view.w=canvas.width; view.h=canvas.height;
-    view.hitX=Math.round(0.14*view.w);
-    view.pxPerBeat=Math.max(60, Math.min(140, Math.round(view.w/8)));
-  }
-  sizeCanvas();
-  window.addEventListener('resize', ()=>{ sizeCanvas(); });
+  function sizeCanvas(){ const pr=window.devicePixelRatio||1; const cssW=canvas.clientWidth||800; const cssH=Math.max(260, Math.min(420, Math.round(cssW*0.36))); canvas.width=Math.floor(cssW*pr); canvas.height=Math.floor(cssH*pr); canvas.style.height=cssH+'px'; view.w=canvas.width; view.h=canvas.height; view.hitX=Math.round(0.14*view.w); view.pxPerBeat=Math.max(60, Math.min(140, Math.round(view.w/8))); }
+  sizeCanvas(); window.addEventListener('resize', ()=> sizeCanvas());
 
   // ===== Audio =====
-  let ctx=null, masterGain=null;
+  let ctx=null, masterGain=null; let audioUnlocked=false;
   function ensureAudio(){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)(); masterGain=ctx.createGain(); masterGain.gain.value=gainVal; masterGain.connect(ctx.destination); } }
-  let audioUnlocked=false;
-  function unlockAudioThen(run){
-    ensureAudio();
-    const proceed=()=>{ audioUnlocked=true; if(typeof run==='function') run(); };
-    if(!ctx){ proceed(); return; }
-    if(ctx.state==='running'){ proceed(); return; }
-    ctx.resume().then(()=>{
-      try{ const b=ctx.createBuffer(1,1,ctx.sampleRate); const s=ctx.createBufferSource(); s.buffer=b; s.connect(masterGain); s.start(0);}catch(_){}
-      setTimeout(proceed,0);
-    }).catch(()=> setTimeout(proceed,0));
-  }
+  function unlockAudioThen(run){ ensureAudio(); const proceed=()=>{ audioUnlocked=true; if(typeof run==='function') run(); }; if(!ctx){ proceed(); return; } if(ctx.state==='running'){ proceed(); return; } ctx.resume().then(()=>{ try{ const b=ctx.createBuffer(1,1,ctx.sampleRate); const s=ctx.createBufferSource(); s.buffer=b; s.connect(masterGain); s.start(0);}catch(_){ } setTimeout(proceed,0); }).catch(()=> setTimeout(proceed,0)); }
   document.addEventListener('touchstart', ()=> unlockAudioThen(), {once:true, passive:true});
   document.addEventListener('mousedown', ()=> unlockAudioThen(), {once:true});
-
-  function playGuide(freq, durMs){
-    ensureAudio();
-    const gnode=ctx.createGain(); const osc=ctx.createOscillator();
-    osc.type='sine'; osc.frequency.value=freq; osc.connect(gnode); gnode.connect(masterGain);
-    const now=ctx.currentTime, a=0.01, r=0.08;
-    gnode.gain.setValueAtTime(0,now);
-    gnode.gain.linearRampToValueAtTime(1,now+a);
-    gnode.gain.setTargetAtTime(0, now + durMs/1000 - r, r);
-    osc.start(now); osc.stop(now + durMs/1000 + 0.02);
-  }
+  function playGuide(freq, durMs){ ensureAudio(); const gnode=ctx.createGain(); const osc=ctx.createOscillator(); osc.type='sine'; osc.frequency.value=freq; osc.connect(gnode); gnode.connect(masterGain); const now=ctx.currentTime,a=0.01,r=0.08; gnode.gain.setValueAtTime(0,now); gnode.gain.linearRampToValueAtTime(1,now+a); gnode.gain.setTargetAtTime(0, now + durMs/1000 - r, r); osc.start(now); osc.stop(now + durMs/1000 + 0.02); }
 
   // ===== Pitch detection =====
   let micStream=null, analyser=null, micBuf=null, rafId=null, lastFreq=null, lastCents=null, listening=false;
@@ -166,68 +119,66 @@
   function startListening(){ if(!audioUnlocked){ unlockAudioThen(()=> startListening()); return; } navigator.mediaDevices.getUserMedia({audio:true,video:false}).then(stream=>{ micStream=stream; const src=ctx.createMediaStreamSource(stream); analyser=ctx.createAnalyser(); analyser.fftSize=2048; src.connect(analyser); micBuf=new Float32Array(analyser.fftSize); listening=true; const loop=()=>{ analyser.getFloatTimeDomainData(micBuf); const f=autoCorrelateFloat32(micBuf); updateDetected(f); rafId=requestAnimationFrame(loop); }; loop(); }).catch(e=>{ alert('Mikrofonzugriff fehlgeschlagen – bitte HTTPS & Rechte prüfen.'); console.error(e); }); }
   function stopListening(){ listening=false; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
 
-  // ===== Parts (placeholder) =====
-  const PART_INDEX = {
-    invitatorium_antiphon: { title: "Invitatorium – Antiphon", url: "parts/invitatorium_antiphon.musicxml", type: "xml" },
-    invitatorium_psalmvers:{ title: "Invitatorium – Psalmvers (Psalmton)", url: "parts/invitatorium_psalmvers.musicxml", type: "xml" },
-    eroeffnung:            { title: "Eröffnung (Versikel/Antwort)", url: "parts/eroeffnung.musicxml", type: "xml" },
-    responsorium:          { title: "Responsorium kurz", url: "parts/responsorium_kurz.musicxml", type: "xml" },
-    benedictus_antiphon:   { title: "Benedictus – Antiphon", url: "parts/benedictus_antiphon.musicxml", type: "xml" },
-    vaterunser:            { title: "Vaterunser (Antwortton)", url: "parts/vaterunser_antwortton.musicxml", type: "xml" },
-    segen:                 { title: "Segen (kurz)", url: "parts/segen_kurz.musicxml", type: "xml" }
-  };
+  // ===== Data & State =====
+  let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let timer=null; let playStartMs=0; let songBeat=0; let lastMs=0; let highwayCache=[];
 
-  // ===== Build notes =====
-  let bpm=70, gainVal=0.2, root=60;
-  let syllables=[], currentIdx=0, playing=false, timer=null, playStartMs=0, songBeat=0, lastMs=0, highwayCache=[], totalBeats=0;
+  // ===== MusicXML import (no UI) =====
+  function stepToMidi(step, alter, octave){ const map={C:0,D:2,E:4,F:5,G:7,A:9,B:11,H:11}; const base=map[step?.toUpperCase?.()||'C']; return 12*(octave+1) + base + (alter||0); }
+  function importMusicXML(xmlText, useLyrics){ const dom=new DOMParser().parseFromString(xmlText,'application/xml'); const divisions=parseFloat(dom.querySelector('divisions')?.textContent||'1')||1; const notes=Array.from(dom.querySelectorAll('note')); const items=[]; for(const n of notes){ if(n.querySelector('rest')) continue; const step=n.querySelector('pitch>step')?.textContent||'C'; const alter=parseInt(n.querySelector('pitch>alter')?.textContent||'0',10)||0; const oct=parseInt(n.querySelector('pitch>octave')?.textContent||'4',10)||4; const durTicks=parseFloat(n.querySelector('duration')?.textContent||'1'); const beats=durTicks/divisions; const midi=stepToMidi(step,alter,oct); let syll='•'; if(useLyrics!==false){ const l=n.querySelector('lyric text'); if(l && l.textContent) syll=l.textContent; } items.push({ text:syll, midi, dur:Math.max(0.25,beats) }); }
+    if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); $('sylText').value = items.map(x=>x.text).join('|'); } }
 
-  function renderSyll(){ syllWrapEl.innerHTML=''; syllables.forEach((s,i)=>{ const span=document.createElement('span'); span.className='syll'+(i===currentIdx?' active':''); span.textContent=s.text; span.title=`Soll: ${midiToName(s.midi)} (${midiToFreq(s.midi).toFixed(1)} Hz)`; syllWrapEl.appendChild(span); }); }
-  function buildPsalmToneDegrees(n){ const scale=SCALE_MAJOR, dom=4; const line=new Array(Math.max(1,n)).fill(scale[dom]); if(n>=3){ line[n-3]=Math.max(0,scale[dom]-1); line[n-2]=scale[dom]+1; line[n-1]=scale[dom]; } return line; }
-  function makeNotesFromSyllables(list){ return list.map(s=>({...s, dur: s.text.endsWith('~')?2:(s.text.endsWith('^')?3:1)})); }
-  function buildFromText(){ const raw=$('sylText').value; const parts=raw.split('|').map(s=>s.trim()).filter(Boolean); const base=parseInt($('rootNum').value||root,10); root=base; let degrees = $('psalmMode').checked? buildPsalmToneDegrees(parts.length) : SCALE_MAJOR; const out=parts.map((p,i)=>({ text:p, midi: base + ($('psalmMode').checked? degrees[i] : degrees[i%degrees.length]) })); syllables=makeNotesFromSyllables(out); currentIdx=0; updateTarget(); buildHighwayCache(); renderSyll(); }
-  function loadPart(key){ const part=PARTS[key]; if(!part) return; $('sylText').value=part.text; $('psalmMode').checked = part.mode==='psalmtone'; buildFromTextWithDegrees(part); }
-  function buildFromTextWithDegrees(part){ const pieces=part.text.split('|').map(s=>s.trim()).filter(Boolean); const base=parseInt($('rootNum').value||root,10); root=base; let degs = part.mode==='psalmtone'? buildPsalmToneDegrees(pieces.length) : (part.degrees||SCALE_MAJOR); syllables = makeNotesFromSyllables(pieces.map((p,i)=>({ text:p, midi: base + (part.mode==='psalmtone'? degs[i] : degs[i%degs.length]) })) ); currentIdx=0; updateTarget(); buildHighwayCache(); renderSyll(); }
-
-  // ===== Highway timing / render =====
-  function buildHighwayCache(){ let t=0; highwayCache=syllables.map(s=>({ ...s, startBeat:t, heldSec:0, complete:false })); syllables.forEach(s=>{ t += s.dur||1; }); totalBeats=t; }
-  function midiToY(m){ const rangeTop = root+12; const rangeBottom = root-12; return (1-(m-rangeBottom)/(rangeTop-rangeBottom))*(canvas.height-20)+10; }
-  function drawHighway(now){ if(lastMs===0) lastMs=now; const dt=(now-lastMs)/1000; lastMs=now; if(playing){ songBeat=((now-playStartMs)/1000)*(bpm/60); } const w=canvas.width, h=canvas.height, px=view.pxPerBeat, hitX=view.hitX; const ctx2=g; ctx2.clearRect(0,0,w,h); ctx2.fillStyle='#0b1220'; ctx2.fillRect(0,0,w,h);
-    if($('showNotation').checked){ ctx2.strokeStyle='#172036'; ctx2.lineWidth=1; [root+12,root+10,root+8,root+7,root+5].forEach(m=>{ const y=midiToY(m); ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(w,y); ctx2.stroke(); }); }
+  // ===== Highway timing & render =====
+  function buildHighwayCache(){ let t=0; highwayCache = syllables.map(s=>({ ...s, startBeat:t, heldSec:0, complete:false })); syllables.forEach(s=>{ t += s.dur||1; }); }
+  function midiToY(m){ const rangeTop = 72; const rangeBottom = 48; return (1-(m-rangeBottom)/(rangeTop-rangeBottom))*(canvas.height-20)+10; }
+  function drawHighway(now){ if(lastMs===0) lastMs=now; const dt=(now-lastMs)/1000; lastMs=now; if(playing){ songBeat=((now-playStartMs)/1000)*(bpm/60); }
+    const w=canvas.width, h=canvas.height, px=view.pxPerBeat, hitX=view.hitX; const ctx2=g; ctx2.clearRect(0,0,w,h); ctx2.fillStyle='#0b1220'; ctx2.fillRect(0,0,w,h);
+    if($('showNotation').checked){ ctx2.strokeStyle='#172036'; ctx2.lineWidth=1; [76,74,72,71,69].forEach(m=>{ const y=midiToY(m); ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(w,y); ctx2.stroke(); }); }
     ctx2.strokeStyle='#1f2a44'; for(let i=0;i<16;i++){ const x=w - i*px; ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,h); ctx2.stroke(); }
     ctx2.strokeStyle='#94a3b8'; ctx2.beginPath(); ctx2.moveTo(hitX,0); ctx2.lineTo(hitX,h); ctx2.stroke();
-    let active=null;
-    highwayCache.forEach(n=>{ const rel=n.startBeat - songBeat; const x=w - rel*px; const wid=(n.dur||1)*px*0.95; const y=midiToY(n.midi); const nh=14; if(x+wid<0 || x>w) return; ctx2.fillStyle='#334155'; ctx2.fillRect(x,y-nh/2,wid,nh); const need=(n.dur||1)*60/bpm; const ratio=Math.min(1,n.heldSec/need); if(ratio>0){ ctx2.fillStyle='rgba(34,197,94,0.9)'; ctx2.fillRect(x,y-nh/2,wid*ratio,nh);} if(n.complete){ ctx2.strokeStyle='#16a34a'; ctx2.lineWidth=2; ctx2.strokeRect(x+0.5,y-nh/2+0.5,wid-1,nh-1);} if($('showNotation').checked){ ctx2.fillStyle='#e5e7eb'; const cx=x+8; ctx2.save(); ctx2.translate(cx,y); ctx2.rotate(-0.3); ctx2.beginPath(); ctx2.ellipse(0,0,10,7,0,0,Math.PI*2); ctx2.fill(); ctx2.restore(); } if(!active && x<=hitX && hitX<=x+wid) active={n, need}; });
+    let active=null; highwayCache.forEach(n=>{ const rel=n.startBeat - songBeat; const x=w - rel*px; const wid=(n.dur||1)*px*0.95; const y=midiToY(n.midi); const nh=14; if(x+wid<0 || x>w) return; ctx2.fillStyle='#334155'; ctx2.fillRect(x,y-nh/2,wid,nh); const need=(n.dur||1)*60/bpm; const ratio=Math.min(1,n.heldSec/need); if(ratio>0){ ctx2.fillStyle='rgba(34,197,94,0.9)'; ctx2.fillRect(x,y-nh/2,wid*ratio,nh);} if(n.complete){ ctx2.strokeStyle='#16a34a'; ctx2.lineWidth=2; ctx2.strokeRect(x+0.5,y-nh/2+0.5,wid-1,nh-1);} if($('showNotation').checked){ ctx2.fillStyle='#e5e7eb'; const cx=x+8; ctx2.save(); ctx2.translate(cx,y); ctx2.rotate(-0.3); ctx2.beginPath(); ctx2.ellipse(0,0,10,7,0,0,Math.PI*2); ctx2.fill(); ctx2.restore(); } if(!active && x<=hitX && hitX<=x+wid) active={n, need}; });
     if(active){ if(lastCents!=null && Math.abs(lastCents)<=30){ active.n.heldSec += dt; if(active.n.heldSec>=active.need) active.n.complete=true; } }
     if(lastFreq){ const y=midiToY(freqToMidi(lastFreq)); ctx2.fillStyle='#eab308'; ctx2.beginPath(); ctx2.arc(w-8,y,5,0,Math.PI*2); ctx2.fill(); }
   }
   function animate(now){ drawHighway(now||performance.now()); if(playing) requestAnimationFrame(animate); }
   document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && playing){ requestAnimationFrame(animate); } });
 
-  // ===== Public handlers (inline-safe) =====
+  // ===== UI helpers =====
+  function renderSyll(){ syllWrapEl.innerHTML=''; syllables.forEach((s,i)=>{ const span=document.createElement('span'); span.className='syll'+(i===currentIdx?' active':''); span.textContent=s.text; span.title=`Soll: ${midiToName(s.midi)} (${midiToFreq(s.midi).toFixed(1)} Hz)`; syllWrapEl.appendChild(span); }); }
+  function updateTarget(){ const s=syllables[currentIdx]||syllables[0]; if(!s){ targetNoteEl.textContent='–'; return; } targetNoteEl.textContent=midiToName(s.midi)+' ('+midiToFreq(s.midi).toFixed(1)+' Hz)'; }
+
+  // ===== Controls =====
   function PS_status(msg){ const s=$('status'); if(s) s.textContent=msg||''; }
-  function PS_play(){ unlockAudioThen(()=>{ if(playing||syllables.length===0) buildFromText(); playing=true; playStartMs=performance.now(); songBeat=0; lastMs=0; currentIdx=0; tick(); if(timer) clearInterval(timer); timer=setInterval(tick, Math.max(120,60000/bpm)); requestAnimationFrame(animate); PS_status('Playing…'); }); return false; }
+  function PS_play(){ unlockAudioThen(()=>{ if(playing||syllables.length===0){ /* keep state */ } playing=true; playStartMs=performance.now(); songBeat=0; lastMs=0; currentIdx=0; tick(); if(timer) clearInterval(timer); timer=setInterval(tick, Math.max(120,60000/bpm)); requestAnimationFrame(animate); PS_status('Playing…'); }); return false; }
   function PS_stop(){ playing=false; if(timer) clearInterval(timer); PS_status(''); return false; }
   function PS_test(){ unlockAudioThen(()=>{ playGuide(midiToFreq(60),400); PS_status('Testton (C4)'); setTimeout(()=>PS_status(''),700); }); return false; }
   function PS_mic(){ if(listening){ stopListening(); PS_status(''); } else { unlockAudioThen(()=>{ startListening(); PS_status('Mikro aktiv'); }); } return false; }
-  function PS_load(){ try{ const key=$('part').value; loadPart(key); PS_status('Teil geladen: '+(PARTS[key]?.title||key)); setTimeout(()=>PS_status(''),1000); }catch(e){ alert('Fehler beim Laden: '+e.message); } return false; }
   function PS_gain(v){ gainVal=parseFloat(v); ensureAudio(); masterGain.gain.value=gainVal; }
   function PS_bpm(v){ bpm=parseInt(v,10)||70; $('bpmVal').textContent=bpm; }
-  function PS_rebuild(){ buildFromText(); PS_status('Neu aufgebaut'); setTimeout(()=>PS_status(''),800); return false; }
-
-  // ===== Tick & target =====
+  function PS_load(){ try{ const key=$('part').value; loadPart(key); return false; }catch(e){ alert('Fehler beim Laden: '+e.message); return false; } }
   function tick(){ const s=syllables[currentIdx]; if(!s) return; const freq=midiToFreq(s.midi); playGuide(freq, Math.max(100, 60000/bpm*0.9)); currentIdx=(currentIdx+1)%syllables.length; updateTarget(); renderSyll(); }
-  function updateTarget(){ const s=syllables[currentIdx]||syllables[0]; if(!s){ targetNoteEl.textContent='–'; return; } targetNoteEl.textContent=midiToName(s.midi)+' ('+midiToFreq(s.midi).toFixed(1)+' Hz)'; }
+  function updateDetected(freq){ if(!freq){ lastFreq=null; lastCents=null; detectedNoteEl.textContent='–'; devTextEl.textContent='Abweichung: –'; devBarEl.style.width='0%'; devBarEl.style.background='#d1d5db'; return; } lastFreq=freq; const target=syllables[currentIdx]? midiToFreq(syllables[currentIdx].midi):(syllables[0]?midiToFreq(syllables[0].midi):null); const midi=freqToMidi(freq); detectedNoteEl.textContent=`${midiToName(midi)} (${freq.toFixed(1)} Hz)`; if(target){ const cents=1200*Math.log2(freq/target); lastCents=cents; devTextEl.textContent=`Abweichung: ${cents.toFixed(0)} Cent`; const w=Math.min(100, Math.abs(cents)/50*100); devBarEl.style.width=w+'%'; devBarEl.style.background=Math.abs(cents)<=30?'var(--ok)':(cents>30?'var(--hi)':'var(--lo)'); } }
 
-  // ===== Detected pitch UI =====
-  function updateDetected(freq){ if(!freq){ lastFreq=null; lastCents=null; detectedNoteEl.textContent='–'; devTextEl.textContent='Abweichung: –'; devBarEl.style.width='0%'; devBarEl.style.background='#d1d5db'; return; }
-    lastFreq=freq; const target=syllables[currentIdx]? midiToFreq(syllables[currentIdx].midi):(syllables[0]?midiToFreq(syllables[0].midi):null); const midi=freqToMidi(freq); detectedNoteEl.textContent=`${midiToName(midi)} (${freq.toFixed(1)} Hz)`; if(target){ const cents=1200*Math.log2(freq/target); lastCents=cents; devTextEl.textContent=`Abweichung: ${cents.toFixed(0)} Cent`; const w=Math.min(100, Math.abs(cents)/50*100); devBarEl.style.width=w+'%'; devBarEl.style.background=Math.abs(cents)<=30?'var(--ok)':(cents>30?'var(--hi)':'var(--lo)'); } }
+  // ===== External parts index =====
+  const PART_INDEX = {
+    invitatorium_antiphon: { title: 'Invitatorium – Antiphon', url: 'parts/invitatorium_antiphon.musicxml', type: 'xml' },
+    invitatorium_psalmvers:{ title: 'Invitatorium – Psalmvers (Psalmton)', url: 'parts/invitatorium_psalmvers.musicxml', type: 'xml' },
+    eroeffnung:            { title: 'Eröffnung (Versikel/Antwort)', url: 'parts/eroeffnung.musicxml', type: 'xml' },
+    responsorium:          { title: 'Responsorium kurz', url: 'parts/responsorium_kurz.musicxml', type: 'xml' },
+    benedictus_antiphon:   { title: 'Benedictus – Antiphon', url: 'parts/benedictus_antiphon.musicxml', type: 'xml' },
+    vaterunser:            { title: 'Vaterunser (Antwortton)', url: 'parts/vaterunser_antwortton.musicxml', type: 'xml' },
+    segen:                 { title: 'Segen (kurz)', url: 'parts/segen_kurz.musicxml', type: 'xml' }
+  };
 
-  // ===== Boot =====
-  (function boot(){ try{
-    $('sylText').value=PARTS.invitatorium_antiphon.text;
-    loadPart('invitatorium_antiphon');
-    PS_status('Bereit');
-  }catch(e){ console.error(e); PS_status('Fehler: '+e.message); } })();
+  async function loadPart(key){ const entry=PART_INDEX[key]; if(!entry){ alert('Teil nicht gefunden: '+key); return; } try{ const res=await fetch(entry.url + '?v=' + Date.now()); if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(entry.type==='xml'){ importMusicXML(text, true); } else { const data=JSON.parse(text); syllables=data; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); }
+      $('status').textContent='Teil geladen: ' + (entry.title||key); setTimeout(()=> $('status').textContent='', 1200);
+    } catch(e){ console.error(e); alert('Konnte Teil nicht laden: '+e.message); }
+  }
+
+  function fillPartSelect(){ const sel=$('part'); sel.innerHTML=''; Object.entries(PART_INDEX).forEach(([k,v])=>{ const opt=document.createElement('option'); opt.value=k; opt.textContent=v.title||k; sel.appendChild(opt); }); }
+
+  function init(){ sizeCanvas(); fillPartSelect(); const first=Object.keys(PART_INDEX)[0]; if(first){ $('part').value=first; loadPart(first); } requestAnimationFrame(animate); }
+
+  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 </script>
 </body>
 </html>
