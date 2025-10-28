@@ -38,10 +38,10 @@
 <body>
   <div class="wrap">
     <div class="toolbar">
-      <button type="button" onclick="return PS_play();">▶️ Play</button>
-      <button type="button" class="secondary" onclick="return PS_stop();">⏹️ Stop</button>
-      <button type="button" class="ghost" onclick="return PS_mic();">🎙️ Mikro an</button>
-      <button type="button" class="ghost" onclick="return PS_test();">🔊 Test‑Ton</button>
+      <button type="button" id="btnPlay">▶️ Play</button>
+      <button type="button" id="btnStop" class="secondary">⏹️ Stop</button>
+      <button type="button" id="btnMic" class="ghost">🎙️ Mikro an</button>
+      <button type="button" id="btnTest" class="ghost">🔊 Test‑Ton</button>
       <span id="status" class="muted" style="margin-left:8px"></span>
       <span id="embedHint" class="muted" style="margin-left:auto"></span>
     </div>
@@ -70,7 +70,7 @@
           <label>Teil auswählen</label>
           <div class="partrow">
             <select id="part"></select>
-            <button type="button" class="secondary" onclick="return PS_load();">Laden</button>
+            <button type="button" id="btnLoad" class="secondary">Laden</button>
           </div>
 
           <label><input type="checkbox" id="showNotation" checked /> Notenbild auf Notenlinien anzeigen</label>
@@ -166,7 +166,8 @@
         case 'OverconstrainedError': tip='Audio‑Optionen nicht kompatibel. Anderen Browser testen.'; break;
         default: tip='Bitte HTTPS, Browser‑/OS‑Rechte prüfen.';
       }
-      alert(`Mikrofonzugriff fehlgeschlagen (${e && e.name || 'Fehler'}): ${e && e.message || ''}\n${tip}`);
+      alert(`Mikrofonzugriff fehlgeschlagen (${e && e.name || 'Fehler'}): ${e && e.message || ''}
+${tip}`);
     }
   }
 
@@ -254,7 +255,20 @@
 
   function fillPartSelect(){ const sel=$('part'); sel.innerHTML=''; Object.entries(PART_INDEX).forEach(([k,v])=>{ const opt=document.createElement('option'); opt.value=k; opt.textContent=v.title||k; sel.appendChild(opt); }); }
 
-  function init(){ sizeCanvas(); fillPartSelect(); const first=Object.keys(PART_INDEX)[0]; if(first){ $('part').value=first; loadPart(first); } }
+  function init(){
+    sizeCanvas();
+    fillPartSelect();
+    const first=Object.keys(PART_INDEX)[0];
+    if(first){ $('part').value=first; loadPart(first); }
+    // Programmatic event binding (for Wix CSP that blocks inline handlers)
+    $('btnPlay') && $('btnPlay').addEventListener('click', ()=> PS_play());
+    $('btnStop') && $('btnStop').addEventListener('click', ()=> PS_stop());
+    $('btnMic') && $('btnMic').addEventListener('click', ()=> PS_mic());
+    $('btnTest') && $('btnTest').addEventListener('click', ()=> PS_test());
+    $('btnLoad') && $('btnLoad').addEventListener('click', ()=> PS_load());
+    $('gain') && $('gain').addEventListener('input', e=> PS_gain(e.target.value));
+    $('bpm') && $('bpm').addEventListener('input', e=> PS_bpm(e.target.value));
+  } }
 
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 </script>
