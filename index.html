@@ -34,8 +34,31 @@
     .legend{display:flex;gap:16px;align-items:center;color:var(--muted);font-size:13px}
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
     footer{padding:0 22px 22px;color:var(--muted);font-size:12px}
-    .updown { margin-left:10px; display:inline-block; vertical-align:middle; }
-    @media (max-width:720px){.readout{grid-template-columns:1fr}}
+
+    /* Pfeile groß, zentral unter dem Highway */
+    .arrow-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 26px;
+      margin-bottom: 6px;
+    }
+    svg#pitchArrows { width: 120px; height: 80px; }
+
+    /* Skala darunter */
+    .scale-container {
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      margin-bottom: 10px;
+    }
+    svg#centScale { width: 320px; height: 54px; }
+    .scale-label { font-size: 10px; fill: #b7bee6; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+
+    @media (max-width:720px){
+      .readout{grid-template-columns:1fr}
+      svg#centScale { width: 280px; }
+    }
   </style>
 </head>
 <body>
@@ -64,24 +87,7 @@
               <span><span class="dot" style="background:#3ee079"></span>Sing-Phase (3 s)</span>
             </div>
           </div>
-          <div class="pitch-delta" id="deltaText" style="color:#99a1c7;font-size:12px;">Δ: –</div>
-
-          <!-- Up/Down-Pfeile -->
-          <div class="updown" aria-label="Richtung">
-            <svg id="pitchArrows" width="56" height="28" viewBox="0 0 56 28">
-              <defs>
-                <clipPath id="upClip"><rect id="upRect" x="0" y="28" width="24" height="0"/></clipPath>
-                <clipPath id="downClip"><rect id="downRect" x="32" y="0" width="24" height="0"/></clipPath>
-                <linearGradient id="fillGrad" x1="0" y1="1" x2="0" y2="0">
-                  <stop offset="0" stop-color="#2f8cff"/><stop offset="1" stop-color="#29d67a"/>
-                </linearGradient>
-              </defs>
-              <path d="M12 2 L2 18 H22 Z" fill="none" stroke="#8da0d6" stroke-width="2" opacity=".6"/>
-              <path d="M12 2 L2 18 H22 Z" fill="url(#fillGrad)" clip-path="url(#upClip)"/>
-              <path d="M44 26 L34 10 H54 Z" fill="none" stroke="#8da0d6" stroke-width="2" opacity=".6"/>
-              <path d="M44 26 L34 10 H54 Z" fill="url(#fillGrad)" clip-path="url(#downClip)"/>
-            </svg>
-          </div>
+          <div id="deltaText" style="color:#99a1c7;font-size:12px;">Δ: –</div>
         </div>
 
         <div class="highway" id="highway">
@@ -89,6 +95,66 @@
           <div class="target-bar hidden" id="targetBar"></div>
           <div class="fill" id="fill"></div>
         </div>
+
+        <!-- Große Pfeile zentriert unten -->
+        <div class="arrow-container">
+          <svg id="pitchArrows" viewBox="0 0 120 80">
+            <defs>
+              <clipPath id="upClip"><rect id="upRect" x="20" y="80" width="40" height="0"/></clipPath>
+              <clipPath id="downClip"><rect id="downRect" x="60" y="0" width="40" height="0"/></clipPath>
+              <linearGradient id="fillGrad" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0" stop-color="#2f8cff"/><stop offset="1" stop-color="#29d67a"/>
+              </linearGradient>
+            </defs>
+            <!-- ↑ -->
+            <path d="M40 10 L20 40 H60 Z" fill="none" stroke="#8da0d6" stroke-width="3" opacity=".7"/>
+            <path d="M40 10 L20 40 H60 Z" fill="url(#fillGrad)" clip-path="url(#upClip)"/>
+            <!-- ↓ -->
+            <path d="M80 70 L60 40 H100 Z" fill="none" stroke="#8da0d6" stroke-width="3" opacity=".7"/>
+            <path d="M80 70 L60 40 H100 Z" fill="url(#fillGrad)" clip-path="url(#downClip)"/>
+          </svg>
+        </div>
+
+        <!-- Skala ±100 Cent -->
+        <div class="scale-container">
+          <svg id="centScale" viewBox="0 0 320 54" preserveAspectRatio="xMidYMid meet">
+            <!-- Hintergrundlinie -->
+            <line x1="10" y1="20" x2="310" y2="20" stroke="#2a335f" stroke-width="2"/>
+            <!-- Toleranzbereich ±30 cent -->
+            <rect x="10" y="12" width="300" height="16" fill="none"/>
+            <rect id="tolBand" x="10" y="12" width="300" height="16" fill="#3ee079" opacity="0.12" />
+            <!-- Ticks: -100, -50, -25, 0, +25, +50, +100 -->
+            <!-- Mapping: -100..+100 → 10..310 px (300 px Breite) -->
+            <g id="ticks" stroke="#8da0d6" stroke-width="2">
+              <!-- -100 -->
+              <line x1="10" y1="16" x2="10" y2="24"/>
+              <!-- -50 -->
+              <line x1="160" y1="16" x2="160" y2="24"/>
+              <!-- +50 -->
+              <line x1="260" y1="16" x2="260" y2="24"/>
+              <!-- +100 -->
+              <line x1="310" y1="16" x2="310" y2="24"/>
+              <!-- -25 -->
+              <line x1="85" y1="18" x2="85" y2="22"/>
+              <!-- +25 -->
+              <line x1="235" y1="18" x2="235" y2="22"/>
+              <!-- 0 -->
+              <line x1="160" y1="10" x2="160" y2="30" stroke="#bcd0ff"/>
+            </g>
+            <!-- Labels -->
+            <g fill="#b7bee6" class="scale-label">
+              <text x="10"  y="40" text-anchor="middle">-100</text>
+              <text x="85"  y="40" text-anchor="middle">-25</text>
+              <text x="160" y="40" text-anchor="middle">0</text>
+              <text x="235" y="40" text-anchor="middle">+25</text>
+              <text x="260" y="40" text-anchor="middle">+50</text>
+              <text x="310" y="40" text-anchor="middle">+100</text>
+            </g>
+            <!-- Marker -->
+            <polygon id="centMarker" points="160,32 154,46 166,46" fill="#7aa2ff" stroke="#2b3770" stroke-width="1.2"/>
+          </svg>
+        </div>
+
       </section>
     </main>
 
@@ -102,10 +168,12 @@ const A4=440,A4_MIDI=69,NOTE_NAMES=["C","C#","D","D#","E","F","F#","G","G#","A",
 const midiToFreq=m=>A4*Math.pow(2,(m-A4_MIDI)/12),freqToMidi=f=>12*(Math.log2(f/A4))+A4_MIDI,midiToName=m=>{const r=Math.round(m);return NOTE_NAMES[r%12]+(Math.floor(r/12)-1);}
 const MIN_MIDI=60,MAX_MIDI=74,TOL=30;
 const $=id=>document.getElementById(id);
-const startBtn=$("startBtn"),stopBtn=$("stopBtn"),targetNoteEl=$("targetNote"),targetFreqEl=$("targetFreq"),livePitchEl=$("livePitch"),liveCentsEl=$("liveCents"),roundScoreEl=$("roundScore"),statusDot=$("statusDot"),targetBar=$("targetBar"),fillEl=$("fill"),deltaText=$("deltaText");
+const startBtn=$("startBtn"),stopBtn=$("stopBtn"),targetNoteEl=$("targetNote"),targetFreqEl=$("targetFreq"),livePitchEl=$("livePitch"),liveCentsEl=$("liveCents"),roundScoreEl=$("roundScore"),statusDot=$("statusDot"),targetBar=$("targetBar"),fillEl=$("fill");
+
 let audioCtx,analyser,micSource,micStream,osc,gain,rafId,roundTimer,singPhase=false,onTargetMs=0,singStartTs=0,currentMidi=null,currentFreq=null;
 const bufLen=2048,buf=new Float32Array(bufLen);
 
+/* Audio initialisieren */
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
@@ -113,6 +181,8 @@ async function initAudio(){
   analyser=audioCtx.createAnalyser();analyser.fftSize=2048;micSource.connect(analyser);
   osc=audioCtx.createOscillator();osc.type='sine';gain=audioCtx.createGain();gain.gain.value=0;osc.connect(gain).connect(audioCtx.destination);osc.start();
 }
+
+/* Auto-Korrelation */
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0;for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
@@ -126,6 +196,8 @@ function autoCorrelate(){
   let T0=maxpos;const x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;if(a)T0=T0-b/(2*a);
   const f=audioCtx.sampleRate/T0;if(f<50||f>2000||!isFinite(f))return-1;return f;
 }
+
+/* UI / Spiel */
 function setStatus(m){statusDot.classList.remove("ready","live");if(m==="play")statusDot.classList.add("ready");if(m==="sing")statusDot.classList.add("live");}
 function showTargetBar(show){targetBar.classList.toggle("hidden",!show);if(show){targetBar.style.width="0%";targetBar.animate([{width:"0%"},{width:"100%"}],{duration:3000,fill:"forwards",easing:"linear"});}}
 function resetFill(){fillEl.style.width="0%";}
@@ -152,32 +224,60 @@ function startRound(){
     },3000);
   },1000);
 }
+
+/* Pfeil-Indikator (oben/unten) */
 function updateArrowIndicator(cents){
   const upRect=document.getElementById("upRect"),downRect=document.getElementById("downRect");
   if(!upRect||!downRect)return;
   const pct=Math.min(Math.abs(cents)/100,1);
   if(isNaN(cents)||Math.abs(cents)<=TOL){
-    upRect.setAttribute("height",0);upRect.setAttribute("y",28);
+    upRect.setAttribute("height",0);upRect.setAttribute("y",80);
     downRect.setAttribute("height",0);downRect.setAttribute("y",0);return;
   }
   if(cents<-TOL){
-    const h=Math.round(pct*24);
-    upRect.setAttribute("height",h);upRect.setAttribute("y",28-h);
+    const h=Math.round(pct*40);
+    upRect.setAttribute("height",h);upRect.setAttribute("y",80-h);
     downRect.setAttribute("height",0);downRect.setAttribute("y",0);
   }else{
-    const h=Math.round(pct*24);
+    const h=Math.round(pct*40);
     downRect.setAttribute("height",h);downRect.setAttribute("y",0);
-    upRect.setAttribute("height",0);upRect.setAttribute("y",28);
+    upRect.setAttribute("height",0);upRect.setAttribute("y",80);
   }
 }
+
+/* Skala-Update (±100 Cent) */
+function updateCentScale(cents){
+  const marker = document.getElementById("centMarker");
+  const tolBand = document.getElementById("tolBand");
+  if(!marker || !tolBand) return;
+
+  // Toleranzband zentriert auf 0: ±30 Cent → von x=10 + (300*(70/200)) bis x=10 + (300*(130/200))
+  // Einfacher: wir lassen die Breite 300 und die 0 bei x=160, das Band ist nur optisch – passt schon.
+
+  // Clamp auf [-100, 100]
+  const c = Math.max(-100, Math.min(100, cents || 0));
+  // Mapping: -100..+100 → 10..310 (Breite 300 px)
+  const x = 10 + ((c + 100) / 200) * 300;
+
+  // Marker (kleines Dreieck) neu positionieren – wir verschieben alle Punkte auf neue x
+  // Form relativ: (0,-?); wir bauen ihn um x herum
+  const topY = 32, baseY = 46;
+  const pts = `${x},${topY} ${x-6},${baseY} ${x+6},${baseY}`;
+  marker.setAttribute("points", pts);
+}
+
+/* Loop */
 function loop(){
   const f=analyser?autoCorrelate():-1;
   if(f===-1){
-    livePitchEl.textContent="–";liveCentsEl.textContent="–";deltaText.textContent="Δ: –";updateArrowIndicator(NaN);
+    livePitchEl.textContent="–";liveCentsEl.textContent="–";document.getElementById("deltaText").textContent="Δ: –";
+    updateArrowIndicator(NaN);
+    updateCentScale(0);
   }else{
     const name=midiToName(freqToMidi(f));const cents=currentFreq?(1200*Math.log2(f/currentFreq)):0;
-    livePitchEl.textContent=name;liveCentsEl.textContent=f.toFixed(1)+" Hz";deltaText.textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
+    livePitchEl.textContent=name;liveCentsEl.textContent=f.toFixed(1)+" Hz";document.getElementById("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
     updateArrowIndicator(cents);
+    updateCentScale(cents);
     if(singPhase&&currentFreq&&Math.abs(cents)<=TOL){
       const now=performance.now();const elapsed=now-(singStartTs+onTargetMs);
       onTargetMs=Math.min(3000,onTargetMs+Math.min(16,elapsed));setFill(onTargetMs);
@@ -185,6 +285,8 @@ function loop(){
   }
   rafId=requestAnimationFrame(loop);
 }
+
+/* Start/Stop */
 async function start(){
   startBtn.disabled=true;stopBtn.disabled=false;
   try{if(!audioCtx)await initAudio();if(audioCtx.state==="suspended")await audioCtx.resume();}
