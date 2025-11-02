@@ -74,8 +74,8 @@
           <div style="display:flex;align-items:center;gap:10px">
             <span class="status-dot" id="statusDot"></span>
             <div class="legend">
-              <span><span class="dot" style="background:#ffcc66"></span>Ton wird gespielt (1 s)</span>
-              <span><span class="dot" style="background:#3ee079"></span>Sing-Phase (3 s)</span>
+              <span><span class="dot" style="background:#ffcc66"></span>Ton wird gespielt (6 s)</span>
+              <span><span class="dot" style="background:#3ee079"></span>Pause (3 s)</span>
             </div>
           </div>
           <div id="deltaText" style="color:#99a1c7;font-size:12px;">Δ: –</div>
@@ -120,7 +120,7 @@
     </main>
 
     <footer>
-      <p><strong>So funktioniert's:</strong> Nach <em>Start</em> erscheint alle 5 Sekunden ein zufälliger Zielton zwischen <em>C4</em> und <em>D5</em>. Der Ton klingt 1 Sekunde. Danach hast du 3 Sekunden, um den Ton zu singen. Wenn du innerhalb ±30 Cent triffst, füllt sich der grüne Balken.</p>
+      <p><strong>So funktioniert's:</strong> Nach <em>Start</em> erscheint alle <em>9 Sekunden</em> ein zufälliger Zielton zwischen <em>C4</em> und <em>D5</em>. Der Ton klingt <strong>6 Sekunden</strong>, danach <strong>3 Sekunden Pause</strong>. Während der 6 Sekunden füllt sich der grüne Balken, wenn du innerhalb ±30 Cent singst.</p>
     </footer>
   </div>
 
@@ -135,8 +135,9 @@ const targetNoteEl=$("targetNote"),targetFreqEl=$("targetFreq");
 const livePitchEl=$("livePitch"),liveCentsEl=$("liveCents"),roundScoreEl=$("roundScore");
 const statusDot=$("statusDot"),targetBar=$("targetBar"),fillEl=$("fill");
 
-let audioCtx,analyser,micSource,micStream,osc,gain,rafId,roundTimer;
+let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,singStartTs=0,currentMidi=null,currentFreq=null;
+let cycleTimer=null; // steuert 6s Ton + 3s Pause Sequenz
 
 const bufLen=2048,buf=new Float32Array(bufLen);
 
@@ -149,7 +150,7 @@ async function initAudio(){
   osc=audioCtx.createOscillator();osc.type='sine';gain=audioCtx.createGain();gain.gain.value=0;osc.connect(gain).connect(audioCtx.destination);osc.start();
 }
 
-/* Pitch-Detection: Auto-Korrelation */
+/* Auto-Korrelation */
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0;for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
@@ -164,32 +165,51 @@ function autoCorrelate(){
   const f=audioCtx.sampleRate/T0;if(f<50||f>2000||!isFinite(f))return-1;return f;
 }
 
-/* UI/Spiel */
+/* UI / Spiel */
 function setStatus(m){statusDot.classList.remove("ready","live");if(m==="play")statusDot.classList.add("ready");if(m==="sing")statusDot.classList.add("live");}
-function showTargetBar(show){targetBar.classList.toggle("hidden",!show);if(show){targetBar.style.width="0%";targetBar.animate([{width:"0%"},{width:"100%"}],{duration:3000,fill:"forwards",easing:"linear"});}}
+function showTargetBar(show,durMs=6000){targetBar.classList.toggle("hidden",!show);if(show){targetBar.style.width="0%";targetBar.animate([{width:"0%"},{width:"100%"}],{duration:durMs,fill:"forwards",easing:"linear"});}}
 function resetFill(){fillEl.style.width="0%";}
-function setFill(ms){fillEl.style.width=Math.max(0,Math.min(100,(ms/3000)*100))+"%";}
-function playTarget(freq){
-  gain.gain.cancelScheduledValues(audioCtx.currentTime);
-  gain.gain.setValueAtTime(0,audioCtx.currentTime);
-  osc.frequency.setValueAtTime(freq,audioCtx.currentTime);
-  gain.gain.linearRampToValueAtTime(0.18,audioCtx.currentTime+0.02);
-  gain.gain.linearRampToValueAtTime(0.18,audioCtx.currentTime+0.98);
-  gain.gain.linearRampToValueAtTime(0.0,audioCtx.currentTime+1.00);
+function setFill(ms,totalMs){fillEl.style.width=Math.max(0,Math.min(100,(ms/totalMs)*100))+"%";}
+
+/* Ton 6s spielen */
+function playTarget(freq,durMs=6000){
+  const t=audioCtx.currentTime;
+  gain.gain.cancelScheduledValues(t);
+  gain.gain.setValueAtTime(0,t);
+  osc.frequency.setValueAtTime(freq,t);
+  // schneller Attack, dann halten, dann sanft ausblenden
+  gain.gain.linearRampToValueAtTime(0.18,t+0.03);
+  gain.gain.setValueAtTime(0.18,t+durMs/1000-0.05);
+  gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
-function pickRandomMidi(){return Math.floor(Math.random()*(MAX_MIDI-MIN_MIDI+1))+MIN_MIDI;}
-function startRound(){
-  currentMidi=pickRandomMidi();currentFreq=midiToFreq(currentMidi);
-  targetNoteEl.textContent=midiToName(currentMidi);
-  targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
-  setStatus("play");showTargetBar(false);resetFill();playTarget(currentFreq);
-  setTimeout(()=>{
-    setStatus("sing");showTargetBar(true);singPhase=true;onTargetMs=0;singStartTs=performance.now();
-    setTimeout(()=>{
-      singPhase=false;setStatus("idle");showTargetBar(false);
-      roundScoreEl.textContent=Math.round((onTargetMs/3000)*100)+" %";
-    },3000);
-  },1000);
+
+/* Eine komplette Runde: 6s Ton (Singphase) + 3s Pause */
+function runRound(){
+  const SING_MS = 6000, PAUSE_MS = 3000;
+
+  // neuen Zielton wählen
+  currentMidi = Math.floor(Math.random()*(MAX_MIDI-MIN_MIDI+1))+MIN_MIDI;
+  currentFreq = midiToFreq(currentMidi);
+  targetNoteEl.textContent = midiToName(currentMidi);
+  targetFreqEl.textContent = currentFreq.toFixed(2)+" Hz";
+
+  // Singphase starten
+  setStatus("sing"); showTargetBar(true,SING_MS); resetFill();
+  playTarget(currentFreq,SING_MS);
+  singPhase = true; onTargetMs = 0; singStartTs = performance.now();
+
+  // nach 6s: Singphase beenden, Score anzeigen, 3s Pause
+  cycleTimer = setTimeout(()=>{
+    singPhase = false; setStatus("play"); showTargetBar(false);
+    roundScoreEl.textContent = Math.round((onTargetMs/SING_MS)*100) + " %";
+
+    // Pause (kein Ton), dann nächste Runde
+    cycleTimer = setTimeout(()=>{
+      setStatus("sing"); // visuell wieder „bereit“
+      runRound();
+    }, PAUSE_MS);
+
+  }, SING_MS);
 }
 
 /* Skala-Update (±100 Cent) */
@@ -197,7 +217,7 @@ function updateCentScale(cents){
   const marker = document.getElementById("centMarker");
   if(!marker) return;
   const c = Math.max(-100, Math.min(100, cents || 0));
-  // Mapping: -100..+100 → 10..310 px (Breite 300 px)
+  // Mapping: -100..+100 → 10..310 (300 px)
   const x = 10 + ((c + 100) / 200) * 300;
   const topY = 32, baseY = 46;
   marker.setAttribute("points", `${x},${topY} ${x-6},${baseY} ${x+6},${baseY}`);
@@ -211,15 +231,20 @@ function loop(){
     document.getElementById("deltaText").textContent="Δ: –";
     updateCentScale(0);
   }else{
-    const name=midiToName(freqToMidi(f));const cents=currentFreq?(1200*Math.log2(f/currentFreq)):0;
+    const name=midiToName(freqToMidi(f));
+    const cents=currentFreq?(1200*Math.log2(f/currentFreq)):0;
     livePitchEl.textContent=name;
     liveCentsEl.textContent=f.toFixed(1)+" Hz";
     document.getElementById("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
-    updateCentScale(cents);
-    if(singPhase&&currentFreq&&Math.abs(cents)<=TOL){
-      const now=performance.now();const elapsed=now-(singStartTs+onTargetMs);
-      onTargetMs=Math.min(3000,onTargetMs+Math.min(16,elapsed));setFill(onTargetMs);
+
+    // während der 6s Singzeit füllen
+    if(singPhase && currentFreq && Math.abs(cents)<=TOL){
+      const now=performance.now();
+      const elapsed=now-(singStartTs+onTargetMs);
+      onTargetMs=Math.min(6000, onTargetMs + Math.min(16, elapsed));
+      setFill(onTargetMs, 6000);
     }
+    updateCentScale(cents);
   }
   rafId=requestAnimationFrame(loop);
 }
@@ -229,14 +254,19 @@ async function start(){
   startBtn.disabled=true;stopBtn.disabled=false;
   try{if(!audioCtx)await initAudio();if(audioCtx.state==="suspended")await audioCtx.resume();}
   catch(e){alert("Zugriff aufs Mikrofon fehlgeschlagen. Bitte Berechtigung erlauben.");startBtn.disabled=false;stopBtn.disabled=true;return;}
-  startRound();roundTimer=setInterval(startRound,5000);loop();
+  runRound(); loop();
 }
 function stop(){
-  startBtn.disabled=false;stopBtn.disabled=true;cancelAnimationFrame(rafId);clearInterval(roundTimer);
-  resetFill();livePitchEl.textContent="–";liveCentsEl.textContent="–";roundScoreEl.textContent="–";targetNoteEl.textContent="–";targetFreqEl.textContent="– Hz";
-  if(gain&&audioCtx)gain.gain.setValueAtTime(0,audioCtx.currentTime);
+  startBtn.disabled=false;stopBtn.disabled=true;
+  if(rafId) cancelAnimationFrame(rafId);
+  if(cycleTimer) clearTimeout(cycleTimer);
+  resetFill();
+  livePitchEl.textContent="–";liveCentsEl.textContent="–";roundScoreEl.textContent="–";
+  targetNoteEl.textContent="–";targetFreqEl.textContent="– Hz";
+  if(gain&&audioCtx) gain.gain.setValueAtTime(0,audioCtx.currentTime);
 }
-startBtn.addEventListener("click",start);stopBtn.addEventListener("click",stop);
+startBtn.addEventListener("click",start);
+stopBtn.addEventListener("click",stop);
 </script>
 </body>
 </html>
