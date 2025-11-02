@@ -1,276 +1,350 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="noindex,nofollow" />
-  <title>PsalmHero – Mette (Wix‑Embed Ready)</title>
+  <title>Vokal‑Intonations‑Trainer</title>
   <style>
-    :root{ --bg:#f6f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --ok:#16a34a; --hi:#ea580c; --lo:#2563eb; --rail:#e5e7eb }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
-    .wrap{max-width:980px;margin:0 auto;padding:16px}
-    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    button{appearance:none;border:1px solid #e5e7eb;background:#111827;color:#fff;border-radius:16px;padding:12px 18px;font-weight:600;font-size:16px;line-height:1.2}
-    button.secondary{background:#fff;color:var(--ink)}
-    button.ghost{background:#fff;color:var(--ink);border-style:dashed}
-    .grid{display:grid;grid-template-columns:1fr;gap:16px;margin-top:16px}
-    @media(min-width:900px){.grid{grid-template-columns:2fr 1fr}}
-    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;padding:16px}
-    .title{margin:0 0 10px 0;font-size:18px}
-    .row{display:flex;justify-content:space-between;align-items:baseline;margin:8px 0}
-    .muted{color:var(--muted);font-size:13px}
-    .bar{height:10px;background:var(--rail);border-radius:999px;overflow:hidden}
-    .bar>div{height:100%;width:0}
-    .syll{display:inline-block;padding:8px 12px;border-radius:14px;border:1px solid #e5e7eb;background:#fff;margin:6px 6px 0 0}
-    .syll.active{background:#000;color:#fff;border-color:#000}
-    .inputs label{display:block;font-size:13px;margin:8px 0 4px}
-    input[type="range"], select{width:100%}
-    input[type="number"], input[type="text"]{width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:10px}
-    .partrow{display:grid;grid-template-columns:1fr auto;gap:8px;width:100%}
-    canvas{display:block;width:100%;height:300px;background:#0b1220;border-radius:14px;border:1px solid #1f2a44}
-    .legend{display:flex;justify-content:space-between;align-items:center;margin:6px 0 0;color:#94a3b8;font-size:12px}
-    .warn{background:#fff7ed;border:1px solid #fed7aa;color:#7c2d12;border-radius:12px;padding:10px 12px;font-size:14px}
-    .warn strong{font-weight:700}
-    @media(max-width:640px){button{font-size:17px;padding:14px 20px} canvas{height:320px}}
+    :root {
+      --bg: #0f1221;
+      --card: #171a2d;
+      --text: #e9ecff;
+      --muted: #99a1c7;
+      --accent: #7aa2ff;
+      --good: #3ee079;
+      --warn: #ffcc66;
+      --bad: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 700px at 50% -200px, #1b2050, var(--bg));
+      color: var(--text);
+      min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    }
+    .app { width: 100%; max-width: 820px; background: var(--card); border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.35); overflow: hidden; }
+    header { padding: 18px 22px; border-bottom: 1px solid #202545; display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+    header h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; font-weight: 700; }
+    .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    button {
+      appearance: none; border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 700; cursor: pointer;
+      background: #24305a; color: var(--text); transition: transform .05s ease, filter .2s ease, background .2s ease;
+    }
+    button:hover { filter: brightness(1.08); }
+    button:active { transform: translateY(1px); }
+    button.primary { background: linear-gradient(135deg, #4b6bff, #7aa2ff); color: white; }
+    button.danger { background: linear-gradient(135deg, #f06666, #ff6b6b); color: white; }
+
+    main { padding: 22px; display: grid; gap: 18px; }
+
+    .readout { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .card { background: #111528; border: 1px solid #202545; border-radius: 12px; padding: 14px; }
+    .label { font-size: 12px; color: var(--muted); letter-spacing: .4px; text-transform: uppercase; }
+    .value { font-size: 28px; font-weight: 800; margin-top: 4px; }
+    .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+    /* Highway */
+    .highway-wrap { background: #0d1124; border: 1px solid #1a1f3e; border-radius: 16px; padding: 16px; }
+    .highway-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .status-dot { width: 10px; height: 10px; border-radius: 999px; background: var(--bad); box-shadow: 0 0 0 3px rgba(255,107,107,.2); transition: background .2s ease, box-shadow .2s ease; }
+    .status-dot.ready { background: var(--warn); box-shadow: 0 0 0 3px rgba(255,204,102,.2); }
+    .status-dot.live { background: var(--good); box-shadow: 0 0 0 3px rgba(62,224,121,.2); }
+
+    .highway { position: relative; height: 46px; background:
+      linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+      border: 1px solid #222851; border-radius: 12px; overflow: hidden;
+    }
+    .lane-grid { position:absolute; inset:0; background-image: repeating-linear-gradient(90deg, rgba(255,255,255,.06) 0, rgba(255,255,255,.06) 1px, transparent 1px, transparent 48px); pointer-events:none; }
+    .target-bar { position: absolute; top: 4px; bottom: 4px; width: 0; border-radius: 8px; background: linear-gradient(90deg, #4068ff, #7aa2ff); box-shadow: 0 0 18px rgba(122,162,255,.35); transition: width .1s linear; }
+    .target-bar.hidden { display:none; }
+    .fill { position: absolute; top: 4px; bottom: 4px; left: 0; width: 0%; border-radius: 8px; background: linear-gradient(90deg, #29d67a, #6ef0a4); box-shadow: inset 0 0 10px rgba(0,0,0,.3), 0 0 18px rgba(46, 240, 149, .35); transition: width .08s linear; }
+    .pitch-delta { position:absolute; right: 10px; top: 10px; font-size: 12px; color: var(--muted); }
+
+    .legend { display: flex; gap: 16px; align-items: center; color: var(--muted); font-size: 13px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display:inline-block; margin-right: 6px; }
+
+    footer { padding: 0 22px 22px; color: var(--muted); font-size: 12px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    @media (max-width: 720px) { .readout { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="toolbar">
-      <button type="button" id="btnPlay">▶️ Play</button>
-      <button type="button" id="btnStop" class="secondary">⏹️ Stop</button>
-      <button type="button" id="btnMic" class="ghost">🎙️ Mikro an</button>
-      <button type="button" id="btnTest" class="ghost">🔊 Test‑Ton</button>
-      <span id="status" class="muted" style="margin-left:8px"></span>
-      <span id="embedHint" class="muted" style="margin-left:auto"></span>
-    </div>
-
-    <div id="iframeWarn" class="warn" style="display:none;margin-bottom:12px">
-      <strong>Mikrofon im eingebetteten Modus nicht verfügbar.</strong>
-      Dieser Bereich wurde wahrscheinlich in einem iFrame ohne Mikro‑Rechte geladen. 
-      Öffne die App <a id="openNewTab" href="#" target="_blank" rel="noopener">in einem neuen Tab</a> oder erlaube dem iFrame <code>allow="microphone"</code>.
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <h2 class="title">Live‑Übung</h2>
-        <canvas id="highway" width="800" height="300"></canvas>
-        <div class="legend"><span>Noten‑Highway</span><span>Treff‑Linie ▲</span></div>
-        <div class="row"><div class="muted">Zielnote</div><div id="targetNote">–</div></div>
-        <div class="row"><div class="muted">Erkannte Note</div><div id="detectedNote">–</div></div>
-        <div class="bar" aria-label="Abweichungsbalken"><div id="devBar"></div></div>
-        <div class="muted" id="devText" style="margin-top:6px">Abweichung: –</div>
-        <div id="syllWrap" style="margin-top:12px"></div>
+  <div class="app">
+    <header>
+      <h1>Vokal‑Intonations‑Trainer <span style="opacity:.6;font-weight:600">(Guitar‑Hero‑Modus)</span></h1>
+      <div class="controls">
+        <button class="primary" id="startBtn">Start</button>
+        <button class="danger" id="stopBtn" disabled>Stopp</button>
       </div>
+    </header>
 
-      <div class="card">
-        <h3 class="title">Mette‑Teile & Einstellungen</h3>
-        <div class="inputs">
-          <label>Teil auswählen</label>
-          <div class="partrow">
-            <select id="part"></select>
-            <button type="button" id="btnLoad" class="secondary">Laden</button>
-          </div>
-
-          <label><input type="checkbox" id="showNotation" checked /> Notenbild auf Notenlinien anzeigen</label>
-
-          <label>Guide‑Lautstärke</label>
-          <input type="range" id="gain" min="0" max="0.8" step="0.02" value="0.2" oninput="PS_gain(this.value)" />
-
-          <label>Tempo: <span id="bpmVal">70</span> BPM</label>
-          <input type="range" id="bpm" min="40" max="120" step="1" value="70" oninput="PS_bpm(this.value)" />
-
-          <label>Silben‑Vorschau</label>
-          <input type="text" id="sylText" value="" readonly />
+    <main>
+      <section class="readout">
+        <div class="card">
+          <div class="label">Zielton</div>
+          <div class="value" id="targetNote">–</div>
+          <div class="sub" id="targetFreq">– Hz</div>
         </div>
-      </div>
-    </div>
+        <div class="card">
+          <div class="label">Erkannte Tonhöhe</div>
+          <div class="value" id="livePitch">–</div>
+          <div class="sub" id="liveCents">–</div>
+        </div>
+        <div class="card">
+          <div class="label">Trefferquote (letzte Runde)</div>
+          <div class="value" id="roundScore">–</div>
+          <div class="sub">Zeit innerhalb ±30 Cent</div>
+        </div>
+      </section>
 
-    <div class="card" style="margin-top:16px">
-      <strong>Hinweise</strong>
-      <ul>
-        <li>Handy‑Browser: Mikrofon benötigt <em>HTTPS</em> und Freigabe.</li>
-        <li>iOS: Audio startet erst nach dem ersten Tap – wird automatisch freigeschaltet.</li>
-        <li>Teile werden aus <code>/parts/*.musicxml</code> geladen (GitHub Pages).</li>
-      </ul>
-    </div>
+      <section class="highway-wrap">
+        <div class="highway-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="status-dot" id="statusDot"></span>
+            <div class="legend">
+              <span><span class="dot" style="background:var(--warn)"></span>Ton wird gespielt (1s)</span>
+              <span><span class="dot" style="background:var(--good)"></span>Sing‑Phase (3s)</span>
+            </div>
+          </div>
+          <div class="pitch-delta" id="deltaText">Δ: –</div>
+        </div>
+        <div class="highway" id="highway">
+          <div class="lane-grid"></div>
+          <div class="target-bar hidden" id="targetBar"></div>
+          <div class="fill" id="fill"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p><strong>So funktioniert's:</strong> Nach <em>Start</em> erscheint alle 5 Sekunden ein zufälliger Zielton zwischen <em>C4 (eingestrichenes c)</em> und <em>D5 (zweigestrichenes d)</em>. Der Ton klingt 1 Sekunde. Danach hast du 3 Sekunden, um den Ton zu singen. Wenn du innerhalb ±30 Cent triffst, füllt sich der grüne Balken.</p>
+    </footer>
   </div>
 
 <script>
-  // ===== Utils =====
-  const A4=440; // Referenz
-  const midiToFreq = m => A4*Math.pow(2,(m-69)/12);
-  const freqToMidi = f => Math.round(69 + 12*Math.log2(f/A4));
-  const midiToName = m => ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][m%12] + (Math.floor(m/12)-1);
-  const $=id=>document.getElementById(id);
+/*** Ton‑ und Noten‑Utilities ***/
+const A4 = 440;
+const A4_MIDI = 69;
+const midiToFreq = m => A4 * Math.pow(2, (m - A4_MIDI) / 12);
+const freqToMidi = f => 12 * (Math.log2(f / A4)) + A4_MIDI;
+const centsOff = (detected, target) => 1200 * Math.log2(detected / target);
 
-  // iFrame‑Erkennung & Hinweis
-  const inIframe = (()=>{ try { return window.self !== window.top; } catch(e){ return true; } })();
-  window.addEventListener('DOMContentLoaded', ()=>{
-    $('openNewTab').href = window.location.href;
-    if(inIframe){
-      $('iframeWarn').style.display = 'block';
-      $('embedHint').textContent = 'eingebettet';
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const midiToName = m => {
+  const name = NOTE_NAMES[Math.round(m) % 12];
+  const octave = Math.floor(Math.round(m) / 12) - 1; // MIDI octave mapping
+  return `${name}${octave}`;
+};
+
+// Bereich: C4 (60) .. D5 (74)
+const MIN_MIDI = 60; // C4 (eingestrichenes c)
+const MAX_MIDI = 74; // D5 (zweigestrichenes d)
+
+/*** DOM‑Refs ***/
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const targetNoteEl = document.getElementById('targetNote');
+const targetFreqEl = document.getElementById('targetFreq');
+const livePitchEl = document.getElementById('livePitch');
+const liveCentsEl = document.getElementById('liveCents');
+const roundScoreEl = document.getElementById('roundScore');
+const statusDot = document.getElementById('statusDot');
+const targetBar = document.getElementById('targetBar');
+const fillEl = document.getElementById('fill');
+const deltaText = document.getElementById('deltaText');
+const highway = document.getElementById('highway');
+
+/*** Audio‑Setup ***/
+let audioCtx, analyser, micSource, micStream, osc, gain;
+let rafId, detectActive = false;
+
+async function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // Mikrofon
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+  micSource = audioCtx.createMediaStreamSource(micStream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  micSource.connect(analyser);
+  // Synth für Zielton
+  osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  gain = audioCtx.createGain();
+  gain.gain.value = 0; // stumm, bis gespielt wird
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+}
+
+/*** Pitch Detection (Auto‑Korrelation) ***/
+const bufLen = 2048; 
+const buf = new Float32Array(bufLen);
+function autoCorrelate() {
+  analyser.getFloatTimeDomainData(buf);
+  // Energie prüfen
+  let rms = 0;
+  for (let i=0;i<bufLen;i++) rms += buf[i]*buf[i];
+  rms = Math.sqrt(rms / bufLen);
+  if (rms < 0.01) return -1; // zu leise
+
+  let r1 = 0, r2 = bufLen-1, thres = 0.2;
+  for (let i=0;i<bufLen/2;i++) if (Math.abs(buf[i])<thres) { r1 = i; break; }
+  for (let i=1;i<bufLen/2;i++) if (Math.abs(buf[bufLen-i])<thres) { r2 = bufLen-i; break; }
+  const trimmed = buf.slice(r1, r2);
+
+  const size = trimmed.length;
+  const c = new Array(size).fill(0);
+  for (let i=0; i<size; i++) {
+    for (let j=0; j<size-i; j++) c[i] = c[i] + trimmed[j]*trimmed[j+i];
+  }
+  let d=0; while (c[d]>c[d+1]) d++;
+  let maxval=-1, maxpos=-1;
+  for (let i=d; i<size; i++) if (c[i]>maxval) { maxval=c[i]; maxpos=i; }
+  let T0 = maxpos;
+  // Parabolische Interpolation zur Feinabstimmung
+  const x1 = c[T0-1] || 0, x2 = c[T0] || 0, x3 = c[T0+1] || 0;
+  const a = (x1 + x3 - 2*x2) / 2;
+  const b = (x3 - x1) / 2;
+  if (a) T0 = T0 - b/(2*a);
+  const freq = audioCtx.sampleRate / T0;
+  if (freq < 50 || freq > 2000 || !isFinite(freq)) return -1;
+  return freq;
+}
+
+/*** Spiel‑Logik ***/
+let roundTimer = null; // 5s‑Intervall
+let state = 'idle'; // 'idle' | 'play' | 'sing'
+let currentMidi = null; let currentFreq = null; let currentName = null;
+let singStartTs = 0; let onTargetMs = 0; let singPhase = false;
+const TOLERANCE_CENTS = 30; // ±30 Cent
+
+function pickRandomMidi() {
+  const m = Math.floor(Math.random() * (MAX_MIDI - MIN_MIDI + 1)) + MIN_MIDI;
+  return m;
+}
+
+function updateReadoutPitch(detFreq) {
+  if (detFreq === -1) {
+    livePitchEl.textContent = '–';
+    liveCentsEl.textContent = '–';
+    deltaText.textContent = 'Δ: –';
+    return;
+  }
+  const midi = freqToMidi(detFreq);
+  const name = midiToName(midi);
+  const cents = centsOff(detFreq, currentFreq||detFreq);
+  livePitchEl.textContent = `${name}`;
+  liveCentsEl.textContent = `${detFreq.toFixed(1)} Hz`;
+  deltaText.textContent = `Δ: ${isFinite(cents)?cents.toFixed(0):'–'} cent`;
+}
+
+function setStatus(mode) {
+  statusDot.classList.remove('ready','live');
+  if (mode==='play') statusDot.classList.add('ready');
+  if (mode==='sing') statusDot.classList.add('live');
+}
+
+function showTargetBar(show) {
+  targetBar.classList.toggle('hidden', !show);
+  if (show) {
+    // Die Ziel‑Bar wächst über 3s von 0% auf 100% (Visuelle Anmutung)
+    targetBar.style.width = '0%';
+    targetBar.animate([{width:'0%'},{width:'100%'}], { duration: 3000, fill: 'forwards', easing: 'linear' }).onfinish = e=>{
+      targetBar.style.width = '100%';
+    };
+  }
+}
+
+function resetFill() { fillEl.style.width = '0%'; }
+function setFillByMs(ms) { const pct = Math.max(0, Math.min(100, (ms/3000)*100)); fillEl.style.width = pct + '%'; }
+
+function playTarget(freq) {
+  gain.gain.cancelScheduledValues(audioCtx.currentTime);
+  gain.gain.setValueAtTime(0, audioCtx.currentTime);
+  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.18, audioCtx.currentTime + 0.02);
+  gain.gain.linearRampToValueAtTime(0.18, audioCtx.currentTime + 0.98);
+  gain.gain.linearRampToValueAtTime(0.0, audioCtx.currentTime + 1.00);
+}
+
+function startRound() {
+  // 1) Neuen zufälligen Ton wählen
+  currentMidi = pickRandomMidi();
+  currentFreq = midiToFreq(currentMidi);
+  currentName = midiToName(currentMidi);
+  targetNoteEl.textContent = currentName;
+  targetFreqEl.textContent = `${currentFreq.toFixed(2)} Hz`;
+
+  // 2) 1s abspielen
+  state = 'play'; setStatus('play'); showTargetBar(false); resetFill();
+  playTarget(currentFreq);
+
+  // 3) Nach 1s in Sing‑Phase wechseln (3s)
+  window.setTimeout(()=>{
+    state = 'sing'; setStatus('sing'); showTargetBar(true);
+    singPhase = true; onTargetMs = 0; singStartTs = performance.now();
+
+    // Nach 3s Sing‑Phase beenden, Score anzeigen
+    window.setTimeout(()=>{
+      singPhase = false; state = 'idle'; setStatus('idle'); showTargetBar(false);
+      const pct = Math.round((onTargetMs/3000)*100);
+      roundScoreEl.textContent = `${pct}%`;
+      // 1s Leerlauf bis zur nächsten Runde (gemeinsam mit dem 5s‑Takt)
+    }, 3000);
+  }, 1000);
+}
+
+function loop() {
+  const f = autoCorrelate();
+  updateReadoutPitch(f);
+  if (singPhase && f !== -1 && currentFreq) {
+    const cents = Math.abs(centsOff(f, currentFreq));
+    if (cents <= TOLERANCE_CENTS) {
+      // Zeit innerhalb der Toleranz akkumulieren
+      const now = performance.now();
+      const elapsed = now - (singStartTs + onTargetMs);
+      onTargetMs = Math.min(3000, onTargetMs + Math.min(16, elapsed)); // begrenzen
+      setFillByMs(onTargetMs);
     }
-  });
+  }
+  rafId = requestAnimationFrame(loop);
+}
 
-  // ===== DOM refs =====
-  const targetNoteEl=$('targetNote'), detectedNoteEl=$('detectedNote'), devBarEl=$('devBar'), devTextEl=$('devText'), syllWrapEl=$('syllWrap');
-  const canvas=$('highway'); const g=canvas.getContext('2d');
-
-  // Responsive Canvas
-  const view={w:0,h:0,pxPerBeat:90,hitX:110};
-  function sizeCanvas(){ const pr=window.devicePixelRatio||1; const cssW=canvas.clientWidth||800; const cssH=Math.max(260, Math.min(420, Math.round(cssW*0.36))); canvas.width=Math.floor(cssW*pr); canvas.height=Math.floor(cssH*pr); canvas.style.height=cssH+'px'; view.w=canvas.width; view.h=canvas.height; view.hitX=Math.round(0.14*view.w); view.pxPerBeat=Math.max(60, Math.min(140, Math.round(view.w/8))); }
-  sizeCanvas(); window.addEventListener('resize', ()=> sizeCanvas());
-
-  // ===== Audio =====
-  let ctx=null, masterGain=null; let audioUnlocked=false;
-  function ensureAudio(){ if(!ctx){ ctx=new (window.AudioContext||window.webkitAudioContext)(); masterGain=ctx.createGain(); masterGain.gain.value=gainVal; masterGain.connect(ctx.destination); } }
-  function unlockAudioThen(run){ ensureAudio(); const proceed=()=>{ audioUnlocked=true; if(typeof run==='function') run(); }; if(!ctx){ proceed(); return; } if(ctx.state==='running'){ proceed(); return; } ctx.resume().then(()=>{ try{ const b=ctx.createBuffer(1,1,ctx.sampleRate); const s=ctx.createBufferSource(); s.buffer=b; s.connect(masterGain); s.start(0);}catch(_){ } setTimeout(proceed,0); }).catch(()=> setTimeout(proceed,0)); }
-  document.addEventListener('touchstart', ()=> unlockAudioThen(), {once:true, passive:true});
-  document.addEventListener('mousedown', ()=> unlockAudioThen(), {once:true});
-  function playGuide(freq, durMs){ ensureAudio(); const gnode=ctx.createGain(); const osc=ctx.createOscillator(); osc.type='sine'; osc.frequency.value=freq; osc.connect(gnode); gnode.connect(masterGain); const now=ctx.currentTime,a=0.01,r=0.08; gnode.gain.setValueAtTime(0,now); gnode.gain.linearRampToValueAtTime(1,now+a); gnode.gain.setTargetAtTime(0, now + durMs/1000 - r, r); osc.start(now); osc.stop(now + durMs/1000 + 0.02); }
-
-  // ===== Pitch detection =====
-  let micStream=null, analyser=null, micBuf=null, rafId=null, lastFreq=null, lastCents=null, listening=false;
-  function autoCorrelateFloat32(buf){ const SIZE=buf.length; let rms=0; for(let i=0;i<SIZE;i++) rms+=buf[i]*buf[i]; rms=Math.sqrt(rms/SIZE); if(rms<0.01) return null; let r1=0,r2=SIZE-1,th=0.2; for(let i=0;i<SIZE/2;i++){ if(Math.abs(buf[i])<th){r1=i;break;} } for(let i=1;i<SIZE/2;i++){ if(Math.abs(buf[SIZE-i])<th){r2=SIZE-i;break;} } buf=buf.slice(r1,r2); const N=buf.length; const ac=new Float32Array(N); for(let lag=0; lag<N; lag++){ let sum=0; for(let i=0;i<N-lag;i++) sum+=buf[i]*buf[i+lag]; ac[lag]=sum; } let d=0; while(d<N && ac[d]>ac[d+1]) d++; let maxPos=d,maxVal=-1; for(let i=d;i<N;i++){ if(ac[i]>maxVal){maxVal=ac[i]; maxPos=i;} } if(maxPos===0) return null; const x1=ac[maxPos-1]||0, x2=ac[maxPos], x3=ac[maxPos+1]||0; const shift=(x3-x1)/(2*(2*x2-x1-x3)); const period=(maxPos+shift); const f=(ctx?ctx.sampleRate:48000)/period; if(f<60||f>1000) return null; return f; }
-
-  // === DIAGNOSE‑Version: robuster getUserMedia + iFrame‑Hint ===
-  async function startListening(){
-    if(!audioUnlocked){ unlockAudioThen(()=> startListening()); return; }
-
-    // iFrame‑Hinweis, weil viele Wix‑Embeds kein "allow=microphone" setzen
-    if(inIframe){ $('iframeWarn').style.display='block'; }
-
-    try {
-      if (navigator.permissions && navigator.permissions.query) {
-        try { const perm = await navigator.permissions.query({ name: 'microphone' }); console.log('[Mic] permission state:', perm.state); } catch(_){ }
-      }
-      try { const devs = await navigator.mediaDevices.enumerateDevices(); const mics = devs.filter(d=>d.kind==='audioinput'); console.log('[Mic] inputs:', mics); if(!mics.length){ alert('Kein Mikrofon gefunden. Bitte Gerät/OS prüfen.'); return; } } catch(_){ }
-
-      const constraints = { audio: { echoCancellation:false, noiseSuppression:false, autoGainControl:false }, video:false };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      micStream = stream; ensureAudio(); const src=ctx.createMediaStreamSource(stream); analyser=ctx.createAnalyser(); analyser.fftSize=2048; src.connect(analyser); micBuf=new Float32Array(analyser.fftSize); listening=true; PS_status('Mikro aktiv');
-      const loop=()=>{ analyser.getFloatTimeDomainData(micBuf); const f=autoCorrelateFloat32(micBuf); updateDetected(f); rafId=requestAnimationFrame(loop); }; loop();
-    } catch (e) {
-      console.error('getUserMedia error:', e && e.name, e && e.message, e);
-      let tip='';
-      switch(e && e.name){
-        case 'NotFoundError': tip='Kein Mikrofon erkannt – bitte Gerät/OS prüfen.'; break;
-        case 'NotReadableError': tip='Mikrofon ist von einer anderen App belegt (Zoom/Teams/OBS?).'; break;
-        case 'NotAllowedError':
-        case 'SecurityError':
-          tip = inIframe ? 'Im iFrame ohne Mikro‑Rechte. Öffne die App im neuen Tab oder setze im Embed: allow="microphone".' : 'Berechtigung verweigert – Browser/OS‑Einstellungen prüfen.';
-          break;
-        case 'OverconstrainedError': tip='Audio‑Optionen nicht kompatibel. Anderen Browser testen.'; break;
-        default: tip='Bitte HTTPS, Browser‑/OS‑Rechte prüfen.';
-      }
-      alert(`Mikrofonzugriff fehlgeschlagen (${e && e.name || 'Fehler'}): ${e && e.message || ''}
-${tip}`);
+/*** Start/Stop ***/
+async function start() {
+  startBtn.disabled = true; stopBtn.disabled = false;
+  if (!audioCtx) {
+    try { await initAudio(); } catch (e) {
+      alert('Zugriff aufs Mikrofon fehlgeschlagen. Bitte Berechtigung erlauben.');
+      startBtn.disabled = false; stopBtn.disabled = true; return;
     }
   }
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  detectActive = true; loop();
+  // Sofort erste Runde, danach alle 5s
+  startRound();
+  roundTimer = window.setInterval(startRound, 5000);
+}
 
-  function stopListening(){ listening=false; if(rafId) cancelAnimationFrame(rafId); if(micStream){ micStream.getTracks().forEach(t=>t.stop()); } }
+function stop() {
+  startBtn.disabled = false; stopBtn.disabled = true;
+  detectActive = false; cancelAnimationFrame(rafId);
+  if (roundTimer) { clearInterval(roundTimer); roundTimer = null; }
+  state = 'idle'; setStatus('idle'); showTargetBar(false); resetFill();
+  livePitchEl.textContent = '–'; liveCentsEl.textContent = '–'; deltaText.textContent = 'Δ: –';
+  roundScoreEl.textContent = '–'; targetNoteEl.textContent = '–'; targetFreqEl.textContent = '– Hz';
+  if (gain) gain.gain.setValueAtTime(0, audioCtx.currentTime);
+}
 
-  // ===== Data & State =====
-  let bpm=70, gainVal=0.2; let syllables=[]; let currentIdx=0; let playing=false; let noteTimer=null; // pro‑Note Timer
-  let songBeat=0; let lastAnimTs=0; let highwayCache=[]; let lastFreq=null, lastCents=null;
+startBtn.addEventListener('click', start);
+stopBtn.addEventListener('click', stop);
 
-  // ===== MusicXML import (no UI) =====
-  function stepToMidi(step, alter, octave){ const map={C:0,D:2,E:4,F:5,G:7,A:9,B:11,H:11}; const base=map[step?.toUpperCase?.()||'C']; return 12*(octave+1) + base + (alter||0); }
-  function importMusicXML(xmlText, useLyrics){ const dom=new DOMParser().parseFromString(xmlText,'application/xml'); const divisions=parseFloat(dom.querySelector('divisions')?.textContent||'1')||1; const notes=Array.from(dom.querySelectorAll('note')); const items=[]; for(const n of notes){ if(n.querySelector('rest')) continue; const step=n.querySelector('pitch>step')?.textContent||'C'; const alter=parseInt(n.querySelector('pitch>alter')?.textContent||'0',10)||0; const oct=parseInt(n.querySelector('pitch>octave')?.textContent||'4',10)||4; const durTicks=parseFloat(n.querySelector('duration')?.textContent||'1'); const beats=durTicks/divisions; const midi=stepToMidi(step,alter,oct); let syll='•'; if(useLyrics!==false){ const l=n.querySelector('lyric text'); if(l && l.textContent) syll=l.textContent; } items.push({ text:syll, midi, dur:Math.max(0.25,beats) }); }
-    if(items.length){ syllables=items; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); $('sylText').value = items.map(x=>x.text).join('|'); songBeat=0; lastAnimTs=0; }
-  }
+// Aufräumen bei Navigationswechsel
+window.addEventListener('visibilitychange', ()=>{
+  if (document.hidden && audioCtx) gain && (gain.gain.value = 0);
+});
 
-  // ===== Highway timing & render =====
-  function buildHighwayCache(){ let t=0; highwayCache = syllables.map(s=>({ ...s, startBeat:t, heldSec:0, complete:false })); syllables.forEach(s=>{ t += (s.dur||1); }); }
-  function midiToY(m){ const rangeTop = 72; const rangeBottom = 48; return (1-(m-rangeBottom)/(rangeTop-rangeBottom))*(canvas.height-20)+10; }
-  function drawHighway(now){
-    const w=canvas.width, h=canvas.height, px=view.pxPerBeat, hitX=view.hitX; const ctx2=g; ctx2.clearRect(0,0,w,h); ctx2.fillStyle='#0b1220'; ctx2.fillRect(0,0,w,h);
-    if($('showNotation').checked){ ctx2.strokeStyle='#172036'; ctx2.lineWidth=1; [76,74,72,71,69].forEach(m=>{ const y=midiToY(m); ctx2.beginPath(); ctx2.moveTo(0,y); ctx2.lineTo(w,y); ctx2.stroke(); }); }
-    ctx2.strokeStyle='#1f2a44'; for(let i=0;i<16;i++){ const x=w - i*px; ctx2.beginPath(); ctx2.moveTo(x,0); ctx2.lineTo(x,h); ctx2.stroke(); }
-    ctx2.strokeStyle='#94a3b8'; ctx2.beginPath(); ctx2.moveTo(hitX,0); ctx2.lineTo(hitX,h); ctx2.stroke();
-    let active=null; highwayCache.forEach(n=>{ const rel=n.startBeat - songBeat; const x=w - rel*px; const wid=(n.dur||1)*px*0.95; const y=midiToY(n.midi); const nh=14; if(x+wid<0 || x>w) return; ctx2.fillStyle='#334155'; ctx2.fillRect(x,y-nh/2,wid,nh); const need=(n.dur||1)*60/bpm; const held=(n.heldSec||0); const ratio=Math.min(1, held/need); if(ratio>0){ ctx2.fillStyle='rgba(34,197,94,0.9)'; ctx2.fillRect(x,y-nh/2,wid*ratio,nh);} if(n.complete){ ctx2.strokeStyle='#16a34a'; ctx2.lineWidth=2; ctx2.strokeRect(x+0.5,y-nh/2+0.5,wid-1,nh-1);} if($('showNotation').checked){ ctx2.fillStyle='#e5e7eb'; const cx=x+8; ctx2.save(); ctx2.translate(cx,y); ctx2.rotate(-0.3); ctx2.beginPath(); ctx2.ellipse(0,0,10,7,0,0,Math.PI*2); ctx2.fill(); ctx2.restore(); } if(!active && x<=hitX && hitX<=x+wid) active={n, need:(n.dur||1)*60/bpm}; });
-    if(active){ if(lastCents!=null && Math.abs(lastCents)<=30){ active.n.heldSec = (active.n.heldSec||0) + (1/60); if(active.n.heldSec>=active.need) active.n.complete=true; } }
-    if(lastFreq){ const y=midiToY(freqToMidi(lastFreq)); ctx2.fillStyle='#eab308'; ctx2.beginPath(); ctx2.arc(w-8,y,5,0,Math.PI*2); ctx2.fill(); }
-  }
-
-  function animate(now){
-    if(!lastAnimTs) lastAnimTs = now;
-    const dt = (now - lastAnimTs) / 1000; // s
-    lastAnimTs = now;
-    if(playing){ songBeat += dt * (bpm/60); }
-    drawHighway(now);
-    requestAnimationFrame(animate);
-  }
-  requestAnimationFrame(animate);
-
-  // ===== UI helpers =====
-  function renderSyll(){ syllWrapEl.innerHTML=''; syllables.forEach((s,i)=>{ const span=document.createElement('span'); span.className='syll'+(i===currentIdx?' active':''); span.textContent=s.text; span.title=`Soll: ${midiToName(s.midi)} (${midiToFreq(s.midi).toFixed(1)} Hz)`; syllWrapEl.appendChild(span); }); }
-  function updateTarget(){ const s=syllables[currentIdx]||syllables[0]; if(!s){ targetNoteEl.textContent='–'; return; } targetNoteEl.textContent=midiToName(s.midi)+' ('+midiToFreq(s.midi).toFixed(1)+' Hz)'; }
-
-  // ===== Variable‑Dauer Playback (pro Note)
-  function scheduleNextNote(){
-    if(!playing || !syllables.length) return;
-    const s = syllables[currentIdx];
-    updateTarget();
-    renderSyll();
-    const beatMs = 60000 / bpm;
-    const playMs = Math.max(100, (s.dur || 1) * beatMs * 0.95);
-    playGuide(midiToFreq(s.midi), playMs);
-    const wait = Math.max(20, (s.dur || 1) * beatMs);
-    if(noteTimer) clearTimeout(noteTimer);
-    noteTimer = setTimeout(()=>{
-      currentIdx = (currentIdx + 1) % syllables.length;
-      scheduleNextNote();
-    }, wait);
-  }
-
-  // ===== Controls =====
-  function PS_status(msg){ const s=$('status'); if(s) s.textContent=msg||''; }
-  function PS_play(){ unlockAudioThen(()=>{ if(!syllables.length){ return; } playing=true; lastAnimTs=0; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); PS_status('Playing…'); }); return false; }
-  function PS_stop(){ playing=false; if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } PS_status(''); return false; }
-  function PS_test(){ unlockAudioThen(()=>{ playGuide(midiToFreq(60),400); PS_status('Testton (C4)'); setTimeout(()=>PS_status(''),700); }); return false; }
-  function PS_mic(){ if(listening){ stopListening(); PS_status(''); } else { unlockAudioThen(()=>{ startListening(); }); } return false; }
-  function PS_gain(v){ gainVal=parseFloat(v); ensureAudio(); masterGain.gain.value=gainVal; }
-  function PS_bpm(v){ bpm=parseInt(v,10)||70; $('bpmVal').textContent=bpm; if(playing){ if(noteTimer){ clearTimeout(noteTimer); noteTimer=null; } scheduleNextNote(); } }
-  function PS_load(){ try{ const key=$('part').value; loadPart(key); return false; }catch(e){ alert('Fehler beim Laden: '+e.message); return false; } }
-
-  // ===== External parts index =====
-  const PART_INDEX = {
-    invitatorium_antiphon: { title: 'Invitatorium – Antiphon', url: 'parts/invitatorium_antiphon.musicxml', type: 'xml' },
-    invitatorium_psalmvers:{ title: 'Invitatorium – Psalmvers (Psalmton)', url: 'parts/invitatorium_psalmvers.musicxml', type: 'xml' },
-    eroeffnung:            { title: 'Eröffnung (Versikel/Antwort)', url: 'parts/eroeffnung.musicxml', type: 'xml' },
-    responsorium:          { title: 'Responsorium kurz', url: 'parts/responsorium_kurz.musicxml', type: 'xml' },
-    benedictus_antiphon:   { title: 'Benedictus – Antiphon', url: 'parts/benedictus_antiphon.musicxml', type: 'xml' },
-    vaterunser:            { title: 'Vaterunser (Antwortton)', url: 'parts/vaterunser_antwortton.musicxml', type: 'xml' },
-    segen:                 { title: 'Segen (kurz)', url: 'parts/segen_kurz.musicxml', type: 'xml' }
-  };
-
-  async function loadPart(key){ const entry=PART_INDEX[key]; if(!entry){ alert('Teil nicht gefunden: '+key); return; } try{ const res=await fetch(entry.url + '?v=' + Date.now()); if(!res.ok) throw new Error('HTTP '+res.status); const text=await res.text(); if(entry.type==='xml'){ importMusicXML(text, true); } else { const data=JSON.parse(text); syllables=data; currentIdx=0; buildHighwayCache(); updateTarget(); renderSyll(); songBeat=0; lastAnimTs=0; }
-      $('status').textContent='Teil geladen: ' + (entry.title||key); setTimeout(()=> $('status').textContent='', 1200);
-    } catch(e){ console.error(e); alert('Konnte Teil nicht laden: '+e.message); }
-  }
-
-  function fillPartSelect(){ const sel=$('part'); sel.innerHTML=''; Object.entries(PART_INDEX).forEach(([k,v])=>{ const opt=document.createElement('option'); opt.value=k; opt.textContent=v.title||k; sel.appendChild(opt); }); }
-
-  function init(){
-    sizeCanvas();
-    fillPartSelect();
-    const first=Object.keys(PART_INDEX)[0];
-    if(first){ $('part').value=first; loadPart(first); }
-    // Programmatic event binding (for Wix CSP that blocks inline handlers)
-    $('btnPlay') && $('btnPlay').addEventListener('click', ()=> PS_play());
-    $('btnStop') && $('btnStop').addEventListener('click', ()=> PS_stop());
-    $('btnMic') && $('btnMic').addEventListener('click', ()=> PS_mic());
-    $('btnTest') && $('btnTest').addEventListener('click', ()=> PS_test());
-    $('btnLoad') && $('btnLoad').addEventListener('click', ()=> PS_load());
-    $('gain') && $('gain').addEventListener('input', e=> PS_gain(e.target.value));
-    $('bpm') && $('bpm').addEventListener('input', e=> PS_bpm(e.target.value));
-  } }
-
-  if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
 </script>
 </body>
 </html>
