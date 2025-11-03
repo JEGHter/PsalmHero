@@ -80,7 +80,7 @@
       <section class="readout">
         <div class="card"><div class="label">Zielton</div><div class="value" id="targetNote">–</div><div class="sub" id="targetFreq">– Hz</div></div>
         <div class="card"><div class="label">Erkannte Tonhöhe</div><div class="value" id="livePitch">–</div><div class="sub" id="liveCents">–</div></div>
-        <div class="card"><div class="label">Trefferquote (letzte Runde)</div><div class="value" id="roundScore">–</div><div class="sub">Zeit innerhalb ±30 Cent (6 s)</div></div>
+        <div class="card"><div class="label">Trefferquote (letzte Runde)</div><div class="value" id="roundScore">–</div><div class="sub">Zeit innerhalb ±30 Cent (3 s)</div></div>
       </section>
 
       <section class="highway-wrap">
@@ -88,7 +88,7 @@
           <div style="display:flex;align-items:center;gap:10px">
             <span class="status-dot" id="statusDot"></span>
             <div class="legend">
-              <span><span class="dot" style="background:#ffcc66"></span>Ton wird gespielt (6 s)</span>
+              <span><span class="dot" style="background:#ffcc66"></span>Ton wird gespielt (3 s)</span>
               <span><span class="dot" style="background:#3ee079"></span>Pause (3 s)</span>
             </div>
           </div>
@@ -107,9 +107,9 @@
               <line x1="10"  y1="16" x2="10"  y2="24"/>
               <line x1="85"  y1="18" x2="85"  y2="22"/>
               <line x1="160" y1="10" x2="160" y2="30" stroke="#bcd0ff"/>
-              <line x1="235" y1="18" x2="235" y2="22"/>
-              <line x1="260" y1="16" x2="260" y2="24"/>
-              <line x1="310" y1="16" x2="310" y2="24"/>
+              <line x1="235" y1="18" x2="235"  y2="22"/>
+              <line x1="260" y1="16" x2="260"  y2="24"/>
+              <line x1="310" y1="16" x2="310"  y2="24"/>
             </g>
             <g class="scale-label">
               <text x="10"  y="40" text-anchor="middle">-100</text>
@@ -169,50 +169,34 @@ let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
 
-// Männer jetzt: C (48) bis c' (60)
-const RANGES={
-  men:{min:48, max:60},
-  women:{min:57, max:72}
-};
+// Männer: C (48) bis c' (60)
+const RANGES={ men:{min:48, max:60}, women:{min:57, max:72} };
 let rangeKey="men";
 let RANGE_MIN_MIDI=RANGES[rangeKey].min;
 let RANGE_MAX_MIDI=RANGES[rangeKey].max;
 
 let MODE="free";
 const TOL=30;
-const SING_MS=6000,PAUSE_MS=3000;
+const SING_MS=3000, PAUSE_MS=3000;  // hier verkürzt
 const bufLen=2048,buf=new Float32Array(bufLen);
 
-// Challenge
 let challengeRound=0;
 let challengeResults=[];
 
-// Pitch-Hold
 let lastPitchHz=null;
 let lastPitchTs=0;
 const PITCH_HOLD_MS=120;
-
-// lauter nötig zum Zählen
 const COUNT_RMS_MIN=0.004;
 
-/* Hilfsfunktion: gemessene Frequenz auf die Oktave vom Zielton „einrasten“ */
 function snapToTargetOctave(measuredFreq, targetFreq){
   if(!targetFreq || measuredFreq<=0) return measuredFreq;
-  // wir probieren: /4, /2, *1, *2, *4 und nehmen das, was am nächsten zum target ist
-  const candidates=[
-    measuredFreq/4,
-    measuredFreq/2,
-    measuredFreq,
-    measuredFreq*2,
-    measuredFreq*4
-  ].filter(f=>f>20 && f<5000);
+  const candidates=[measuredFreq/4, measuredFreq/2, measuredFreq, measuredFreq*2, measuredFreq*4]
+    .filter(f=>f>20 && f<5000);
   let best=measuredFreq;
   let bestDiff=Infinity;
   for(const c of candidates){
     const d=Math.abs(Math.log2(c/targetFreq));
-    if(d<bestDiff){
-      bestDiff=d; best=c;
-    }
+    if(d<bestDiff){ bestDiff=d; best=c; }
   }
   return best;
 }
@@ -220,16 +204,14 @@ function snapToTargetOctave(measuredFreq, targetFreq){
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   micStream=await navigator.mediaDevices.getUserMedia({
-    audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
-    video:false
+    audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false
   });
   micSource=audioCtx.createMediaStreamSource(micStream);
   analyser=audioCtx.createAnalyser();
   analyser.fftSize=2048;
   micSource.connect(analyser);
-
   osc=audioCtx.createOscillator();
-  osc.type='square'; // laut
+  osc.type='square';
   gain=audioCtx.createGain();
   gain.gain.value=0;
   osc.connect(gain).connect(audioCtx.destination);
@@ -284,14 +266,9 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
-function pickRandomMidi(){
-  return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI;
-}
+function pickRandomMidi(){ return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI; }
 
-function challengeResetUI(){
-  challengeBody.innerHTML="";
-  medalBox.style.display="none";
-}
+function challengeResetUI(){ challengeBody.innerHTML=""; medalBox.style.display="none"; }
 function challengeAddRow(round,note,score){
   const tr=document.createElement("tr");
   tr.innerHTML=`<td>${round}.</td><td>${note}</td><td>${score} %</td>`;
@@ -360,16 +337,12 @@ function updateCentScale(cents){
 function loop(){
   const r=analyser?autoCorrelate():{freq:-1,rms:0};
   const now=performance.now();
-  let f=r.freq;
-  let rms=r.rms;
-  let fresh=true;
+  let f=r.freq, rms=r.rms, fresh=true;
 
   if(f===-1 && lastPitchHz && (now - lastPitchTs) < PITCH_HOLD_MS){
-    f = lastPitchHz;
-    fresh = false;
+    f = lastPitchHz; fresh = false;
   } else if(f !== -1){
-    lastPitchHz = f;
-    lastPitchTs = now;
+    lastPitchHz = f; lastPitchTs = now;
   }
 
   if(f===-1){
@@ -377,11 +350,9 @@ function loop(){
     $("deltaText").textContent="Δ: –";
     updateCentScale(0);
   }else{
-    // HIER: Oktave auf Zielton einrasten
     const snapped = currentFreq ? snapToTargetOctave(f, currentFreq) : f;
     const name=midiToName(freqToMidi(snapped));
     const cents=currentFreq?(1200*Math.log2(snapped/currentFreq)):0;
-
     livePitchEl.textContent=name;
     liveCentsEl.textContent=snapped.toFixed(1)+" Hz";
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
@@ -452,3 +423,4 @@ stopBtn.addEventListener("click",stop);
 </script>
 </body>
 </html>
+
