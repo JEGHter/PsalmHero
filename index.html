@@ -34,6 +34,7 @@
     .legend{display:flex;gap:16px;align-items:center;color:var(--muted);font-size:13px}
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
     footer{padding:0 22px 12px;color:var(--muted);font-size:12px}
+
     .seg { display:flex; background:#111528; border:1px solid #202545; border-radius:12px; overflow:hidden }
     .seg button { background:transparent; border:0; padding:8px 14px; font-weight:700; color:#b7bee6; cursor:pointer; }
     .seg button.active { background:#223060; color:#fff; }
@@ -140,8 +141,7 @@
     </main>
 
     <footer>
-      <p><strong>Hinweis:</strong> Freier Modus läuft durchgehend. Im Challenge-Modus werden 10 Runden gespielt.</p>
-      <p><strong>Wichtig:</strong> Am Handy immer mit Kopfhörern benutzen.</p>
+      <p><strong>Hinweis:</strong> Am Handy bitte mit Kopfhörern.</p>
     </footer>
 
     <section id="privacy">
@@ -177,16 +177,19 @@ let RANGE_MAX_MIDI=RANGES[rangeKey].max;
 let MODE="free";
 const TOL=30;
 const SING_MS=6000,PAUSE_MS=3000;
-
 const bufLen=2048,buf=new Float32Array(bufLen);
 
+// für Challenge
 let challengeRound=0;
 let challengeResults=[];
 
-// NEU: letztes gutes Pitch-Sample puffern
+// für Pitch-Hold
 let lastPitchHz=null;
 let lastPitchTs=0;
 const PITCH_HOLD_MS=120;
+
+// für Zählung: nur wenn wirklich gesungen wird
+const COUNT_RMS_MIN = 0.004;  // lauter als reine Erkennung
 
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
@@ -206,13 +209,14 @@ async function initAudio(){
   osc.start();
 }
 
+// gibt jetzt {freq, rms}, freq = -1 wenn nix
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0;
   for(let i=0;i<bufLen;i++) rms+=buf[i]*buf[i];
   rms=Math.sqrt(rms/bufLen);
-  // Handy-sensibler
-  if(rms<0.0015) return -1;
+  // sehr empfindlich, aber nicht 0
+  if(rms<0.0015) return {freq:-1, rms};
   let r1=0,r2=bufLen-1,th=0.2;
   for(let i=0;i<bufLen/2;i++) if(Math.abs(buf[i])<th){r1=i;break;}
   for(let i=1;i<bufLen/2;i++) if(Math.abs(buf[bufLen-i])<th){r2=bufLen-i;break;}
@@ -226,8 +230,8 @@ function autoCorrelate(){
   const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;
   if(a) T0 = T0 - b/(2*a);
   const f=audioCtx.sampleRate/T0;
-  if(f<50||f>2000||!isFinite(f)) return -1;
-  return f;
+  if(f<50||f>2000||!isFinite(f)) return {freq:-1,rms};
+  return {freq:f, rms};
 }
 
 function setStatus(m){
@@ -250,7 +254,7 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.cancelScheduledValues(t);
   gain.gain.setValueAtTime(0,t);
   osc.frequency.setValueAtTime(freq,t);
-  // deutlich lauter
+  // sehr laut (für Kopfhörer)
   gain.gain.linearRampToValueAtTime(0.8,t+0.03);
   gain.gain.setValueAtTime(0.8,t+durMs/1000-0.05);
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
@@ -270,7 +274,7 @@ function challengeAddRow(round,note,score){
   challengeBody.appendChild(tr);
 }
 function challengeFinish(){
-  if(!challengeResults.length) return;
+  if(!challengeResults.length)return;
   const avg=Math.round(challengeResults.reduce((s,r)=>s+r.score,0)/challengeResults.length);
   let text="Keine Medaille",emoji="—";
   if(avg>=95){text="Gold";emoji="🥇";}
@@ -291,7 +295,6 @@ function runFreeRound(){
   setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
   singPhase=true;onTargetMs=0;
-
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
     roundScoreEl.textContent=Math.round((onTargetMs/SING_MS)*100)+" %";
@@ -309,7 +312,6 @@ function runChallengeRound(){
   setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
   singPhase=true;onTargetMs=0;
-
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
     const score=Math.round((onTargetMs/SING_MS)*100);
@@ -332,12 +334,20 @@ function updateCentScale(cents){
 }
 
 function loop(){
-  let f=analyser?autoCorrelate():-1;
+  const r=analyser?autoCorrelate():{freq:-1,rms:0};
   const now=performance.now();
+  let f=r.freq;
+  let rms=r.rms;
+  let fresh=true;
 
-  // kurzer Aussetzer? dann alten Wert halten
+  // wenn kein aktueller Ton, aber sehr kurz her → für Anzeige halten
   if(f===-1 && lastPitchHz && (now - lastPitchTs) < PITCH_HOLD_MS){
     f = lastPitchHz;
+    // aber: nicht frisch, also nicht zum Auffüllen benutzen
+    fresh = false;
+  } else if (f !== -1){
+    lastPitchHz = f;
+    lastPitchTs = now;
   }
 
   if(f===-1){
@@ -345,16 +355,14 @@ function loop(){
     $("deltaText").textContent="Δ: –";
     updateCentScale(0);
   }else{
-    lastPitchHz = f;
-    lastPitchTs = now;
-
     const name=midiToName(freqToMidi(f));
     const cents=currentFreq?(1200*Math.log2(f/currentFreq)):0;
     livePitchEl.textContent=name;
     liveCentsEl.textContent=f.toFixed(1)+" Hz";
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
-    if(singPhase && currentFreq && Math.abs(cents)<=TOL){
+    // nur zählen, wenn tatsächlich frische Messung UND laut genug UND in Toleranz
+    if(fresh && singPhase && currentFreq && Math.abs(cents)<=TOL && rms >= COUNT_RMS_MIN){
       onTargetMs = Math.min(SING_MS, onTargetMs + 16);
       setFill(onTargetMs, SING_MS);
     }
@@ -415,7 +423,6 @@ function stop(){
   menBtn.disabled=false;womenBtn.disabled=false;
   modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
 }
-
 startBtn.addEventListener("click",start);
 stopBtn.addEventListener("click",stop);
 </script>
