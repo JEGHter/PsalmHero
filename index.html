@@ -34,49 +34,22 @@
     .legend{display:flex;gap:16px;align-items:center;color:var(--muted);font-size:13px}
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
     footer{padding:0 22px 12px;color:var(--muted);font-size:12px}
-
     .seg { display:flex; background:#111528; border:1px solid #202545; border-radius:12px; overflow:hidden }
     .seg button { background:transparent; border:0; padding:8px 14px; font-weight:700; color:#b7bee6; cursor:pointer; }
     .seg button.active { background:#223060; color:#fff; }
     .seg button:disabled { opacity:.55; cursor:not-allowed; }
 
-    .scale-container {
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      margin-top: 18px;
-      margin-bottom: 10px;
-    }
-    svg#centScale { width: 320px; height: 54px; }
-    .scale-label { font-size: 10px; fill: #b7bee6; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    .scale-container { display:flex; justify-content:center; align-items:center; margin-top:18px; margin-bottom:10px; }
+    svg#centScale { width:320px; height:54px; }
+    .scale-label { font-size:10px; fill:#b7bee6; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; }
 
-    #challengePanel {
-      background:#111528;
-      border:1px solid #202545;
-      border-radius:12px;
-      padding:14px;
-      display:none;
-    }
+    #challengePanel { background:#111528; border:1px solid #202545; border-radius:12px; padding:14px; display:none; }
     #challengeTable { width:100%; border-collapse:collapse; font-size:13px; }
     #challengeTable th, #challengeTable td { border-bottom:1px solid rgba(255,255,255,0.03); padding:6px 4px; text-align:left; }
     #challengeTable th { color:#b7bee6; font-weight:600; }
-    #medalBox {
-      margin-top:10px;
-      padding:8px 10px;
-      background:#0d1124;
-      border:1px solid #1a1f3e;
-      border-radius:10px;
-      display:none;
-    }
+    #medalBox { margin-top:10px; padding:8px 10px; background:#0d1124; border:1px solid #1a1f3e; border-radius:10px; display:none; }
 
-    #privacy {
-      background:#0d1124;
-      border-top:1px solid #1a1f3e;
-      padding:14px 22px 20px;
-      font-size:12px;
-      line-height:1.4;
-      color:#b7bee6;
-    }
+    #privacy { background:#0d1124; border-top:1px solid #1a1f3e; padding:14px 22px 20px; font-size:12px; line-height:1.4; color:#b7bee6; }
 
     @media (max-width:720px){
       .readout{grid-template-columns:1fr}
@@ -88,7 +61,6 @@
   <div class="app">
     <header>
       <h1>Vokal-Intonations-Trainer <span style="opacity:.6;font-weight:600">(Guitar-Hero-Modus)</span></h1>
-
       <div class="controls">
         <div class="seg" title="Modus wählen">
           <button id="modeFreeBtn" class="active">Freier Modus</button>
@@ -121,13 +93,11 @@
           </div>
           <div id="deltaText" style="color:#99a1c7;font-size:12px;">Δ: –</div>
         </div>
-
         <div class="highway" id="highway">
           <div class="lane-grid"></div>
           <div class="target-bar hidden" id="targetBar"></div>
           <div class="fill" id="fill"></div>
         </div>
-
         <div class="scale-container">
           <svg id="centScale" viewBox="0 0 320 54" preserveAspectRatio="xMidYMid meet">
             <line x1="10" y1="20" x2="310" y2="20" stroke="#2a335f" stroke-width="2"/>
@@ -170,14 +140,13 @@
     </main>
 
     <footer>
-      <p><strong>Hinweis:</strong> Freier Modus läuft durchgehend. Im Challenge-Modus werden 10 Runden gespielt und danach eine Medaille vergeben.</p>
-      <p><strong>Wichtig:</strong> Am Handy immer mit Kopfhörern nutzen.</p>
+      <p><strong>Hinweis:</strong> Freier Modus läuft durchgehend. Im Challenge-Modus werden 10 Runden gespielt.</p>
+      <p><strong>Wichtig:</strong> Am Handy immer mit Kopfhörern benutzen.</p>
     </footer>
 
     <section id="privacy">
       <h3>Datenschutz-Hinweis – Mikrofonzugriff</h3>
-      <p>Diese Anwendung nutzt den Zugriff auf das Mikrofon ausschließlich zur lokalen Tonhöhenanalyse.</p>
-      <p>Es werden keine Audiodaten gespeichert oder übertragen.</p>
+      <p>Diese Anwendung verarbeitet den Ton nur lokal im Browser.</p>
     </section>
   </div>
 
@@ -197,42 +166,38 @@ const statusDot=$("statusDot"),targetBar=$("targetBar"),fillEl=$("fill");
 const challengePanel=$("challengePanel"),challengeBody=$("challengeBody"),medalBox=$("medalBox");
 
 let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
-let singPhase=false,onTargetMs=0,singStartTs=0,currentMidi=null,currentFreq=null;
+let singPhase=false,onTargetMs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
 
-const RANGES = {
-  men:   {min:45, max:60},
-  women: {min:57, max:72}
-};
-let rangeKey = "men";
-let RANGE_MIN_MIDI = RANGES[rangeKey].min;
-let RANGE_MAX_MIDI = RANGES[rangeKey].max;
+const RANGES={ men:{min:45,max:60}, women:{min:57,max:72} };
+let rangeKey="men";
+let RANGE_MIN_MIDI=RANGES[rangeKey].min;
+let RANGE_MAX_MIDI=RANGES[rangeKey].max;
 
-let MODE = "free";
-
+let MODE="free";
 const TOL=30;
-const SING_MS=6000, PAUSE_MS=3000;
+const SING_MS=6000,PAUSE_MS=3000;
 
 const bufLen=2048,buf=new Float32Array(bufLen);
 
-let challengeRound = 0;
-let challengeResults = [];
+let challengeRound=0;
+let challengeResults=[];
+
+// NEU: letztes gutes Pitch-Sample puffern
+let lastPitchHz=null;
+let lastPitchTs=0;
+const PITCH_HOLD_MS=120;
 
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   micStream=await navigator.mediaDevices.getUserMedia({
-    audio:{
-      echoCancellation:false,
-      noiseSuppression:false,
-      autoGainControl:false
-    },
+    audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
     video:false
   });
   micSource=audioCtx.createMediaStreamSource(micStream);
   analyser=audioCtx.createAnalyser();
   analyser.fftSize=2048;
   micSource.connect(analyser);
-
   osc=audioCtx.createOscillator();
   osc.type='sine';
   gain=audioCtx.createGain();
@@ -244,10 +209,10 @@ async function initAudio(){
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0;
-  for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
+  for(let i=0;i<bufLen;i++) rms+=buf[i]*buf[i];
   rms=Math.sqrt(rms/bufLen);
-  // Handy-Schwelle niedriger
-  if(rms<0.003) return -1;
+  // Handy-sensibler
+  if(rms<0.0015) return -1;
   let r1=0,r2=bufLen-1,th=0.2;
   for(let i=0;i<bufLen/2;i++) if(Math.abs(buf[i])<th){r1=i;break;}
   for(let i=1;i<bufLen/2;i++) if(Math.abs(buf[bufLen-i])<th){r2=bufLen-i;break;}
@@ -258,7 +223,7 @@ function autoCorrelate(){
   for(let i=d;i<size;i++) if(c[i]>maxval){maxval=c[i];maxpos=i;}
   let T0=maxpos;
   const x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;
-  const a=(x1+x3-2*x2)/2, b=(x3-x1)/2;
+  const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;
   if(a) T0 = T0 - b/(2*a);
   const f=audioCtx.sampleRate/T0;
   if(f<50||f>2000||!isFinite(f)) return -1;
@@ -285,9 +250,9 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.cancelScheduledValues(t);
   gain.gain.setValueAtTime(0,t);
   osc.frequency.setValueAtTime(freq,t);
-  // deutlich lauter für Handy + Kopfhörer
-  gain.gain.linearRampToValueAtTime(0.55,t+0.03);
-  gain.gain.setValueAtTime(0.55,t+durMs/1000-0.05);
+  // deutlich lauter
+  gain.gain.linearRampToValueAtTime(0.8,t+0.03);
+  gain.gain.setValueAtTime(0.8,t+durMs/1000-0.05);
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
@@ -296,16 +261,16 @@ function pickRandomMidi(){
 }
 
 function challengeResetUI(){
-  challengeBody.innerHTML = "";
-  medalBox.style.display = "none";
+  challengeBody.innerHTML="";
+  medalBox.style.display="none";
 }
-function challengeAddRow(round, note, score){
+function challengeAddRow(round,note,score){
   const tr=document.createElement("tr");
   tr.innerHTML=`<td>${round}.</td><td>${note}</td><td>${score} %</td>`;
   challengeBody.appendChild(tr);
 }
 function challengeFinish(){
-  if(!challengeResults.length)return;
+  if(!challengeResults.length) return;
   const avg=Math.round(challengeResults.reduce((s,r)=>s+r.score,0)/challengeResults.length);
   let text="Keine Medaille",emoji="—";
   if(avg>=95){text="Gold";emoji="🥇";}
@@ -323,10 +288,9 @@ function runFreeRound(){
   currentFreq=midiToFreq(currentMidi);
   targetNoteEl.textContent=midiToName(currentMidi);
   targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
-
   setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase=true;onTargetMs=0;singStartTs=performance.now();
+  singPhase=true;onTargetMs=0;
 
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
@@ -344,7 +308,7 @@ function runChallengeRound(){
   targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
   setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase=true;onTargetMs=0;singStartTs=performance.now();
+  singPhase=true;onTargetMs=0;
 
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
@@ -368,19 +332,28 @@ function updateCentScale(cents){
 }
 
 function loop(){
-  const f=analyser?autoCorrelate():-1;
+  let f=analyser?autoCorrelate():-1;
+  const now=performance.now();
+
+  // kurzer Aussetzer? dann alten Wert halten
+  if(f===-1 && lastPitchHz && (now - lastPitchTs) < PITCH_HOLD_MS){
+    f = lastPitchHz;
+  }
+
   if(f===-1){
     livePitchEl.textContent="–";liveCentsEl.textContent="–";
     $("deltaText").textContent="Δ: –";
     updateCentScale(0);
   }else{
+    lastPitchHz = f;
+    lastPitchTs = now;
+
     const name=midiToName(freqToMidi(f));
     const cents=currentFreq?(1200*Math.log2(f/currentFreq)):0;
     livePitchEl.textContent=name;
     liveCentsEl.textContent=f.toFixed(1)+" Hz";
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
-    // Handy-fest: wenn getroffen, immer 16 ms gutschreiben
     if(singPhase && currentFreq && Math.abs(cents)<=TOL){
       onTargetMs = Math.min(SING_MS, onTargetMs + 16);
       setFill(onTargetMs, SING_MS);
@@ -417,7 +390,7 @@ async function start(){
     if(!audioCtx)await initAudio();
     if(audioCtx.state==="suspended")await audioCtx.resume();
   }catch(e){
-    alert("Mikrofon nicht verfügbar oder verweigert.");
+    alert("Mikrofon nicht verfügbar.");
     startBtn.disabled=false;stopBtn.disabled=true;
     menBtn.disabled=false;womenBtn.disabled=false;
     modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
