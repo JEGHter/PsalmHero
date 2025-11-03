@@ -169,7 +169,7 @@ let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
 
-// Männer jetzt: kleines c (MIDI 48) bis eingestrichenes c (MIDI 60)
+// Männer jetzt: C (48) bis c' (60)
 const RANGES={
   men:{min:48, max:60},
   women:{min:57, max:72}
@@ -187,13 +187,35 @@ const bufLen=2048,buf=new Float32Array(bufLen);
 let challengeRound=0;
 let challengeResults=[];
 
-// für Pitch-Hold
+// Pitch-Hold
 let lastPitchHz=null;
 let lastPitchTs=0;
 const PITCH_HOLD_MS=120;
 
-// zum Zählen lauter
+// lauter nötig zum Zählen
 const COUNT_RMS_MIN=0.004;
+
+/* Hilfsfunktion: gemessene Frequenz auf die Oktave vom Zielton „einrasten“ */
+function snapToTargetOctave(measuredFreq, targetFreq){
+  if(!targetFreq || measuredFreq<=0) return measuredFreq;
+  // wir probieren: /4, /2, *1, *2, *4 und nehmen das, was am nächsten zum target ist
+  const candidates=[
+    measuredFreq/4,
+    measuredFreq/2,
+    measuredFreq,
+    measuredFreq*2,
+    measuredFreq*4
+  ].filter(f=>f>20 && f<5000);
+  let best=measuredFreq;
+  let bestDiff=Infinity;
+  for(const c of candidates){
+    const d=Math.abs(Math.log2(c/targetFreq));
+    if(d<bestDiff){
+      bestDiff=d; best=c;
+    }
+  }
+  return best;
+}
 
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
@@ -207,7 +229,7 @@ async function initAudio(){
   micSource.connect(analyser);
 
   osc=audioCtx.createOscillator();
-  osc.type='square';             // LAUTER
+  osc.type='square'; // laut
   gain=audioCtx.createGain();
   gain.gain.value=0;
   osc.connect(gain).connect(audioCtx.destination);
@@ -257,7 +279,7 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.cancelScheduledValues(t);
   gain.gain.setValueAtTime(0,t);
   osc.frequency.setValueAtTime(freq,t);
-  gain.gain.linearRampToValueAtTime(1.0,t+0.03);     // MAX
+  gain.gain.linearRampToValueAtTime(1.0,t+0.03);
   gain.gain.setValueAtTime(1.0,t+durMs/1000-0.05);
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
@@ -342,7 +364,7 @@ function loop(){
   let rms=r.rms;
   let fresh=true;
 
-  if(f===-1 && lastPitchHz && (now - lastPitchTs) < 120){
+  if(f===-1 && lastPitchHz && (now - lastPitchTs) < PITCH_HOLD_MS){
     f = lastPitchHz;
     fresh = false;
   } else if(f !== -1){
@@ -355,10 +377,13 @@ function loop(){
     $("deltaText").textContent="Δ: –";
     updateCentScale(0);
   }else{
-    const name=midiToName(freqToMidi(f));
-    const cents=currentFreq?(1200*Math.log2(f/currentFreq)):0;
+    // HIER: Oktave auf Zielton einrasten
+    const snapped = currentFreq ? snapToTargetOctave(f, currentFreq) : f;
+    const name=midiToName(freqToMidi(snapped));
+    const cents=currentFreq?(1200*Math.log2(snapped/currentFreq)):0;
+
     livePitchEl.textContent=name;
-    liveCentsEl.textContent=f.toFixed(1)+" Hz";
+    liveCentsEl.textContent=snapped.toFixed(1)+" Hz";
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
     if(fresh && singPhase && currentFreq && Math.abs(cents)<=TOL && rms >= COUNT_RMS_MIN){
