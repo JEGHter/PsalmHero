@@ -57,7 +57,6 @@
       padding:14px;
       display:none;
     }
-    #challengePanel h3 { margin:0 0 10px 0; font-size:14px; }
     #challengeTable { width:100%; border-collapse:collapse; font-size:13px; }
     #challengeTable th, #challengeTable td { border-bottom:1px solid rgba(255,255,255,0.03); padding:6px 4px; text-align:left; }
     #challengeTable th { color:#b7bee6; font-weight:600; }
@@ -78,8 +77,6 @@
       line-height:1.4;
       color:#b7bee6;
     }
-    #privacy h3 { margin:0 0 6px 0; font-size:13px; color:#e9ecff; }
-    #privacy p { margin:4px 0; }
 
     @media (max-width:720px){
       .readout{grid-template-columns:1fr}
@@ -179,8 +176,8 @@
 
     <section id="privacy">
       <h3>Datenschutz-Hinweis – Mikrofonzugriff</h3>
-      <p>Diese Anwendung nutzt den Zugriff auf das Mikrofon Ihres Endgeräts ausschließlich zur lokalen Tonhöhenanalyse während der Nutzung.</p>
-      <p>Die aufgenommenen Audiodaten werden nicht gespeichert, nicht übertragen und nicht an Dritte weitergegeben. Die gesamte Verarbeitung erfolgt lokal im Browser.</p>
+      <p>Diese Anwendung nutzt den Zugriff auf das Mikrofon ausschließlich zur lokalen Tonhöhenanalyse.</p>
+      <p>Es werden keine Audiodaten gespeichert oder übertragen.</p>
     </section>
   </div>
 
@@ -224,13 +221,18 @@ let challengeResults = [];
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   micStream=await navigator.mediaDevices.getUserMedia({
-    audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
+    audio:{
+      echoCancellation:false,
+      noiseSuppression:false,
+      autoGainControl:false
+    },
     video:false
   });
   micSource=audioCtx.createMediaStreamSource(micStream);
   analyser=audioCtx.createAnalyser();
   analyser.fftSize=2048;
   micSource.connect(analyser);
+
   osc=audioCtx.createOscillator();
   osc.type='sine';
   gain=audioCtx.createGain();
@@ -244,21 +246,22 @@ function autoCorrelate(){
   let rms=0;
   for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
   rms=Math.sqrt(rms/bufLen);
-  if(rms<0.01)return-1;
+  // Handy-Schwelle niedriger
+  if(rms<0.003) return -1;
   let r1=0,r2=bufLen-1,th=0.2;
-  for(let i=0;i<bufLen/2;i++)if(Math.abs(buf[i])<th){r1=i;break;}
-  for(let i=1;i<bufLen/2;i++)if(Math.abs(buf[bufLen-i])<th){r2=bufLen-i;break;}
+  for(let i=0;i<bufLen/2;i++) if(Math.abs(buf[i])<th){r1=i;break;}
+  for(let i=1;i<bufLen/2;i++) if(Math.abs(buf[bufLen-i])<th){r2=bufLen-i;break;}
   const trimmed=buf.slice(r1,r2),size=trimmed.length,c=new Array(size).fill(0);
   for(let i=0;i<size;i++){for(let j=0;j<size-i;j++)c[i]+=trimmed[j]*trimmed[j+i];}
   let d=0;while(c[d]>c[d+1])d++;
   let maxval=-1,maxpos=-1;
-  for(let i=d;i<size;i++)if(c[i]>maxval){maxval=c[i];maxpos=i;}
+  for(let i=d;i<size;i++) if(c[i]>maxval){maxval=c[i];maxpos=i;}
   let T0=maxpos;
   const x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;
-  const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;
-  if(a)T0=T0-b/(2*a);
+  const a=(x1+x3-2*x2)/2, b=(x3-x1)/2;
+  if(a) T0 = T0 - b/(2*a);
   const f=audioCtx.sampleRate/T0;
-  if(f<50||f>2000||!isFinite(f))return-1;
+  if(f<50||f>2000||!isFinite(f)) return -1;
   return f;
 }
 
@@ -282,8 +285,9 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.cancelScheduledValues(t);
   gain.gain.setValueAtTime(0,t);
   osc.frequency.setValueAtTime(freq,t);
-  gain.gain.linearRampToValueAtTime(0.3,t+0.03);
-  gain.gain.setValueAtTime(0.3,t+durMs/1000-0.05);
+  // deutlich lauter für Handy + Kopfhörer
+  gain.gain.linearRampToValueAtTime(0.55,t+0.03);
+  gain.gain.setValueAtTime(0.55,t+durMs/1000-0.05);
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
@@ -296,87 +300,71 @@ function challengeResetUI(){
   medalBox.style.display = "none";
 }
 function challengeAddRow(round, note, score){
-  const tr = document.createElement("tr");
-  tr.innerHTML = `<td>${round}.</td><td>${note}</td><td>${score} %</td>`;
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td>${round}.</td><td>${note}</td><td>${score} %</td>`;
   challengeBody.appendChild(tr);
 }
 function challengeFinish(){
-  if(challengeResults.length === 0) return;
-  const avg = Math.round(challengeResults.reduce((s,r)=>s+r.score,0)/challengeResults.length);
-  let text = "Keine Medaille";
-  let emoji = "—";
-  if (avg >= 95){ text = "Gold"; emoji = "🥇"; }
-  else if (avg >= 85){ text = "Silber"; emoji = "🥈"; }
-  else if (avg >= 75){ text = "Bronze"; emoji = "🥉"; }
-
-  medalBox.style.display = "block";
-  medalBox.innerHTML = `<strong>Durchschnitt:</strong> ${avg} %<br><strong>Ergebnis:</strong> ${emoji} ${text}`;
-
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
-  menBtn.disabled = false;
-  womenBtn.disabled = false;
-  modeFreeBtn.disabled = false;
-  modeChallengeBtn.disabled = false;
+  if(!challengeResults.length)return;
+  const avg=Math.round(challengeResults.reduce((s,r)=>s+r.score,0)/challengeResults.length);
+  let text="Keine Medaille",emoji="—";
+  if(avg>=95){text="Gold";emoji="🥇";}
+  else if(avg>=85){text="Silber";emoji="🥈";}
+  else if(avg>=75){text="Bronze";emoji="🥉";}
+  medalBox.style.display="block";
+  medalBox.innerHTML=`<strong>Durchschnitt:</strong> ${avg} %<br><strong>Ergebnis:</strong> ${emoji} ${text}`;
+  startBtn.disabled=false;stopBtn.disabled=true;
+  menBtn.disabled=false;womenBtn.disabled=false;
+  modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
 }
 
 function runFreeRound(){
-  currentMidi = pickRandomMidi();
-  currentFreq = midiToFreq(currentMidi);
-  targetNoteEl.textContent = midiToName(currentMidi);
-  targetFreqEl.textContent = currentFreq.toFixed(2)+" Hz";
+  currentMidi=pickRandomMidi();
+  currentFreq=midiToFreq(currentMidi);
+  targetNoteEl.textContent=midiToName(currentMidi);
+  targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
 
-  setStatus("sing"); showTargetBar(true,SING_MS); resetFill();
+  setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase = true; onTargetMs = 0; singStartTs = performance.now();
+  singPhase=true;onTargetMs=0;singStartTs=performance.now();
 
-  cycleTimer = setTimeout(()=>{
-    singPhase = false; setStatus("play"); showTargetBar(false);
-    roundScoreEl.textContent = Math.round((onTargetMs/SING_MS)*100)+" %";
-
-    cycleTimer = setTimeout(()=>{ setStatus("sing"); runFreeRound(); }, PAUSE_MS);
-  }, SING_MS);
+  cycleTimer=setTimeout(()=>{
+    singPhase=false;setStatus("play");showTargetBar(false);
+    roundScoreEl.textContent=Math.round((onTargetMs/SING_MS)*100)+" %";
+    cycleTimer=setTimeout(()=>{setStatus("sing");runFreeRound();},PAUSE_MS);
+  },SING_MS);
 }
 
 function runChallengeRound(){
-  if (challengeRound >= 10){
-    challengeFinish();
-    return;
-  }
+  if(challengeRound>=10){challengeFinish();return;}
   challengeRound++;
-
-  currentMidi = pickRandomMidi();
-  currentFreq = midiToFreq(currentMidi);
-  targetNoteEl.textContent = midiToName(currentMidi);
-  targetFreqEl.textContent = currentFreq.toFixed(2)+" Hz";
-
-  setStatus("sing"); showTargetBar(true,SING_MS); resetFill();
+  currentMidi=pickRandomMidi();
+  currentFreq=midiToFreq(currentMidi);
+  targetNoteEl.textContent=midiToName(currentMidi);
+  targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
+  setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase = true; onTargetMs = 0; singStartTs = performance.now();
+  singPhase=true;onTargetMs=0;singStartTs=performance.now();
 
-  cycleTimer = setTimeout(()=>{
-    singPhase = false; setStatus("play"); showTargetBar(false);
-    const score = Math.round((onTargetMs/SING_MS)*100);
-    roundScoreEl.textContent = score+" %";
-    challengeResults.push({round: challengeRound, note: midiToName(currentMidi), score});
-    challengeAddRow(challengeRound, midiToName(currentMidi), score);
-
-    if (challengeRound >= 10){
-      challengeFinish();
-    } else {
-      cycleTimer = setTimeout(()=>{ runChallengeRound(); }, PAUSE_MS);
+  cycleTimer=setTimeout(()=>{
+    singPhase=false;setStatus("play");showTargetBar(false);
+    const score=Math.round((onTargetMs/SING_MS)*100);
+    roundScoreEl.textContent=score+" %";
+    challengeResults.push({round:challengeRound,note:midiToName(currentMidi),score});
+    challengeAddRow(challengeRound,midiToName(currentMidi),score);
+    if(challengeRound>=10){challengeFinish();}
+    else{
+      cycleTimer=setTimeout(()=>{runChallengeRound();},PAUSE_MS);
     }
-
-  }, SING_MS);
+  },SING_MS);
 }
 
 function updateCentScale(cents){
-  const marker = document.getElementById("centMarker");
-  if(!marker) return;
-  const c = Math.max(-100, Math.min(100, cents || 0));
-  const x = 10 + ((c + 100) / 200) * 300;
-  const topY = 32, baseY = 46;
-  marker.setAttribute("points", `${x},${topY} ${x-6},${baseY} ${x+6},${baseY}`);
+  const marker=document.getElementById("centMarker");
+  if(!marker)return;
+  const c=Math.max(-100,Math.min(100,cents||0));
+  const x=10+((c+100)/200)*300;
+  marker.setAttribute("points",`${x},32 ${x-6},46 ${x+6},46`);
 }
 
 function loop(){
@@ -392,58 +380,52 @@ function loop(){
     liveCentsEl.textContent=f.toFixed(1)+" Hz";
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
-    // FIX für Handy: einfach immer in kleinen Schritten hochzählen
+    // Handy-fest: wenn getroffen, immer 16 ms gutschreiben
     if(singPhase && currentFreq && Math.abs(cents)<=TOL){
       onTargetMs = Math.min(SING_MS, onTargetMs + 16);
       setFill(onTargetMs, SING_MS);
     }
-
     updateCentScale(cents);
   }
   rafId=requestAnimationFrame(loop);
 }
 
 function setRange(key){
-  rangeKey = key;
-  RANGE_MIN_MIDI = RANGES[key].min;
-  RANGE_MAX_MIDI = RANGES[key].max;
-  menBtn.classList.toggle('active', key==='men');
-  womenBtn.classList.toggle('active', key==='women');
+  rangeKey=key;
+  RANGE_MIN_MIDI=RANGES[key].min;
+  RANGE_MAX_MIDI=RANGES[key].max;
+  menBtn.classList.toggle('active',key==='men');
+  womenBtn.classList.toggle('active',key==='women');
 }
-menBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setRange('men'); });
-womenBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setRange('women'); });
+menBtn.addEventListener('click',()=>{if(startBtn.disabled)return;setRange('men');});
+womenBtn.addEventListener('click',()=>{if(startBtn.disabled)return;setRange('women');});
 
 function setMode(newMode){
-  MODE = newMode;
-  modeFreeBtn.classList.toggle('active', newMode==='free');
-  modeChallengeBtn.classList.toggle('active', newMode==='challenge');
-  challengePanel.style.display = (newMode === 'challenge') ? 'block' : 'none';
+  MODE=newMode;
+  modeFreeBtn.classList.toggle('active',newMode==='free');
+  modeChallengeBtn.classList.toggle('active',newMode==='challenge');
+  challengePanel.style.display=(newMode==='challenge')?'block':'none';
 }
-modeFreeBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setMode('free'); });
-modeChallengeBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setMode('challenge'); });
+modeFreeBtn.addEventListener('click',()=>{if(startBtn.disabled)return;setMode('free');});
+modeChallengeBtn.addEventListener('click',()=>{if(startBtn.disabled)return;setMode('challenge');});
 
 async function start(){
-  menBtn.disabled = true; womenBtn.disabled = true;
-  modeFreeBtn.disabled = true; modeChallengeBtn.disabled = true;
-
+  menBtn.disabled=true;womenBtn.disabled=true;
+  modeFreeBtn.disabled=true;modeChallengeBtn.disabled=true;
   startBtn.disabled=true;stopBtn.disabled=false;
   try{
     if(!audioCtx)await initAudio();
     if(audioCtx.state==="suspended")await audioCtx.resume();
   }catch(e){
-    alert("Zugriff aufs Mikrofon fehlgeschlagen. Bitte Berechtigung erlauben.");
+    alert("Mikrofon nicht verfügbar oder verweigert.");
     startBtn.disabled=false;stopBtn.disabled=true;
-    menBtn.disabled = false; womenBtn.disabled = false;
-    modeFreeBtn.disabled = false; modeChallengeBtn.disabled = false;
+    menBtn.disabled=false;womenBtn.disabled=false;
+    modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
     return;
   }
-
-  if (MODE === 'challenge'){
-    challengeRound = 0;
-    challengeResults = [];
-    challengeResetUI();
-    runChallengeRound();
-  } else {
+  if(MODE==='challenge'){
+    challengeRound=0;challengeResults=[];challengeResetUI();runChallengeRound();
+  }else{
     runFreeRound();
   }
   loop();
@@ -451,16 +433,16 @@ async function start(){
 
 function stop(){
   startBtn.disabled=false;stopBtn.disabled=true;
-  if(rafId) cancelAnimationFrame(rafId);
-  if(cycleTimer) clearTimeout(cycleTimer);
+  if(rafId)cancelAnimationFrame(rafId);
+  if(cycleTimer)clearTimeout(cycleTimer);
   resetFill();
   livePitchEl.textContent="–";liveCentsEl.textContent="–";roundScoreEl.textContent="–";
   targetNoteEl.textContent="–";targetFreqEl.textContent="– Hz";
-  if(gain&&audioCtx) gain.gain.setValueAtTime(0,audioCtx.currentTime);
-
-  menBtn.disabled = false; womenBtn.disabled = false;
-  modeFreeBtn.disabled = false; modeChallengeBtn.disabled = false;
+  if(gain&&audioCtx)gain.gain.setValueAtTime(0,audioCtx.currentTime);
+  menBtn.disabled=false;womenBtn.disabled=false;
+  modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
 }
+
 startBtn.addEventListener("click",start);
 stopBtn.addEventListener("click",stop);
 </script>
