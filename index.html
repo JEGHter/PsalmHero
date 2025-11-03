@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PsalmHero</title>
+  <title>Vokal-Intonations-Trainer</title>
   <style>
     :root { --bg:#0f1221; --card:#171a2d; --text:#e9ecff; --muted:#99a1c7; --good:#3ee079; --warn:#ffcc66; }
     *{box-sizing:border-box}
@@ -12,7 +12,7 @@
     header{padding:18px 22px;border-bottom:1px solid #202545;display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap}
     h1{font-size:18px;margin:0;letter-spacing:.2px;font-weight:700}
     .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    button{appearance:none;border:0;border-radius:12px;padding:12px 16px;font-weight:700;cursor:pointer;background:#24305a;color:var(--text);touch-action:manipulation}
+    button{appearance:none;border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;background:#24305a;color:var(--text);touch-action:manipulation}
     button.primary{background:linear-gradient(135deg,#4b6bff,#7aa2ff);color:#fff}
     button.danger{background:linear-gradient(135deg,#f06666,#ff6b6b);color:#fff}
     main{padding:22px;display:grid;gap:18px}
@@ -33,16 +33,15 @@
     .fill{position:absolute;top:4px;bottom:4px;left:0;width:0%;border-radius:8px;background:linear-gradient(90deg,#29d67a,#6ef0a4);box-shadow:inset 0 0 10px rgba(0,0,0,.3),0 0 18px rgba(46,240,149,.35)}
     .legend{display:flex;gap:16px;align-items:center;color:var(--muted);font-size:13px}
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
-    footer{padding:0 22px 22px;color:var(--muted);font-size:12px}
+    footer{padding:0 22px 12px;color:var(--muted);font-size:12px}
 
-    .range { display:flex; gap:8px; align-items:center; }
+    /* Segment-Schalter */
     .seg { display:flex; background:#111528; border:1px solid #202545; border-radius:12px; overflow:hidden }
-    .seg button {
-      background:transparent; border:0; padding:10px 14px; font-weight:800; color:#b7bee6; cursor:pointer;
-    }
+    .seg button { background:transparent; border:0; padding:8px 14px; font-weight:700; color:#b7bee6; cursor:pointer; }
     .seg button.active { background:#223060; color:#fff; }
-    .seg button:disabled { opacity:.5; cursor:not-allowed; }
+    .seg button:disabled { opacity:.55; cursor:not-allowed; }
 
+    /* Skala unter dem Highway */
     .scale-container {
       display:flex;
       justify-content:center;
@@ -53,6 +52,50 @@
     svg#centScale { width: 320px; height: 54px; }
     .scale-label { font-size: 10px; fill: #b7bee6; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
 
+    /* Challenge-Panel */
+    #challengePanel {
+      background:#111528;
+      border:1px solid #202545;
+      border-radius:12px;
+      padding:14px;
+      display:none;
+    }
+    #challengePanel h3 {
+      margin:0 0 10px 0;
+      font-size:14px;
+    }
+    #challengeTable {
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    #challengeTable th, #challengeTable td {
+      border-bottom:1px solid rgba(255,255,255,0.03);
+      padding:6px 4px;
+      text-align:left;
+    }
+    #challengeTable th { color:#b7bee6; font-weight:600; }
+    #medalBox {
+      margin-top:10px;
+      padding:8px 10px;
+      background:#0d1124;
+      border:1px solid #1a1f3e;
+      border-radius:10px;
+      display:none;
+    }
+
+    /* Datenschutz */
+    #privacy {
+      background:#0d1124;
+      border-top:1px solid #1a1f3e;
+      padding:14px 22px 20px;
+      font-size:12px;
+      line-height:1.4;
+      color:#b7bee6;
+    }
+    #privacy h3 { margin:0 0 6px 0; font-size:13px; color:#e9ecff; }
+    #privacy p { margin:4px 0; }
+
     @media (max-width:720px){
       .readout{grid-template-columns:1fr}
       svg#centScale { width: 280px; }
@@ -62,15 +105,20 @@
 <body>
   <div class="app">
     <header>
-      <h1>PsalmHero <span style="opacity:.6;font-weight:600">(Intonationstrainer)</span></h1>
+      <h1>Vokal-Intonations-Trainer <span style="opacity:.6;font-weight:600">(Guitar-Hero-Modus)</span></h1>
 
       <div class="controls">
-        <div class="range" title="Tonlage auswählen">
-          <div class="seg">
-            <button id="menBtn" class="active">Männer</button>
-            <button id="womenBtn">Frauen</button>
-          </div>
+        <!-- Modus -->
+        <div class="seg" title="Modus wählen">
+          <button id="modeFreeBtn" class="active">Freier Modus</button>
+          <button id="modeChallengeBtn">Challenge</button>
         </div>
+        <!-- Tonlage -->
+        <div class="seg" title="Tonlage wählen">
+          <button id="menBtn" class="active">Männer</button>
+          <button id="womenBtn">Frauen</button>
+        </div>
+        <!-- Start/Stop -->
         <button class="primary" id="startBtn">Start</button>
         <button class="danger" id="stopBtn" disabled>Stopp</button>
       </div>
@@ -126,43 +174,81 @@
           </svg>
         </div>
       </section>
+
+      <!-- Challenge-Ausgabe -->
+      <section id="challengePanel">
+        <h3>Challenge-Läufe</h3>
+        <table id="challengeTable">
+          <thead>
+            <tr>
+              <th style="width:60px">Durchlauf</th>
+              <th style="width:140px">Ton</th>
+              <th>Ergebnis</th>
+            </tr>
+          </thead>
+          <tbody id="challengeBody">
+          </tbody>
+        </table>
+        <div id="medalBox"></div>
+      </section>
     </main>
 
     <footer>
-      <p><strong>Ablauf:</strong> Nach <em>Start</em> spielt ein zufälliger Zielton aus dem gewählten Bereich <strong>6 Sekunden</strong>. Danach folgen <strong>3 Sekunden Pause</strong>. Während der 6 Sekunden füllt sich der grüne Balken, wenn du innerhalb ±30 Cent singst.</p>
-      <p><strong>Hinweis:</strong> Bitte mit Kopfhörern verwenden, damit das Mikro nur deine Stimme und nicht den abgespielten Ton erfasst.</p>
+      <p><strong>Hinweis:</strong> Freier Modus läuft durchgehend. Im Challenge-Modus werden 10 Runden gespielt und danach eine Medaille vergeben.</p>
     </footer>
+
+    <!-- Datenschutz-Hinweis -->
+    <section id="privacy">
+      <h3>Datenschutz-Hinweis – Mikrofonzugriff</h3>
+      <p>Diese Anwendung nutzt den Zugriff auf das Mikrofon Ihres Endgeräts ausschließlich zur lokalen Tonhöhenanalyse während der Nutzung.</p>
+      <p>Die aufgenommenen Audiodaten werden nicht gespeichert, nicht übertragen und nicht an Dritte weitergegeben. Die gesamte Verarbeitung der Tonsignale erfolgt ausschließlich innerhalb Ihres Webbrowsers (lokal auf Ihrem Gerät).</p>
+      <p>Erst nach Ihrer ausdrücklichen Zustimmung („Mikrofon erlauben“) beginnt die Analyse. Sie können den Mikrofonzugriff jederzeit in den Einstellungen Ihres Browsers widerrufen.</p>
+      <p>Diese Seite kann über GitHub Pages bereitgestellt werden. Beim Aufruf der Seite werden technisch bedingt Zugriffsdaten (z. B. IP-Adresse, Zeitpunkt, Browser) vom Hosting-Anbieter verarbeitet. Weitere Informationen finden Sie in der Datenschutzerklärung des Anbieters.</p>
+    </section>
   </div>
 
 <script>
+/* ===== Musik-Utils ===== */
 const A4=440,A4_MIDI=69,NOTE_NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const midiToFreq=m=>A4*Math.pow(2,(m-A4_MIDI)/12);
 const freqToMidi=f=>12*(Math.log2(f/A4))+A4_MIDI;
 const midiToName=m=>{const r=Math.round(m);return NOTE_NAMES[r%12]+(Math.floor(r/12)-1);}
 
+/* ===== DOM ===== */
 const $=id=>document.getElementById(id);
 const startBtn=$("startBtn"),stopBtn=$("stopBtn");
 const menBtn=$("menBtn"),womenBtn=$("womenBtn");
+const modeFreeBtn=$("modeFreeBtn"),modeChallengeBtn=$("modeChallengeBtn");
 const targetNoteEl=$("targetNote"),targetFreqEl=$("targetFreq");
 const livePitchEl=$("livePitch"),liveCentsEl=$("liveCents"),roundScoreEl=$("roundScore");
 const statusDot=$("statusDot"),targetBar=$("targetBar"),fillEl=$("fill");
+const challengePanel=$("challengePanel"),challengeBody=$("challengeBody"),medalBox=$("medalBox");
 
 let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,singStartTs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
 
+/* Modus & Bereich */
 const RANGES = {
-  men:   {min:45, max:60},
-  women: {min:57, max:72}
+  men:   {min:45, max:60},   // A2–C4
+  women: {min:57, max:72}    // A3–C5
 };
 let rangeKey = "men";
 let RANGE_MIN_MIDI = RANGES[rangeKey].min;
 let RANGE_MAX_MIDI = RANGES[rangeKey].max;
+
+let MODE = "free"; // "free" oder "challenge"
+
 const TOL=30;
 const SING_MS=6000, PAUSE_MS=3000;
 
 const bufLen=2048,buf=new Float32Array(bufLen);
 
+/* Challenge-Variablen */
+let challengeRound = 0;
+let challengeResults = [];
+
+/* ===== Audio initialisieren ===== */
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
@@ -171,6 +257,7 @@ async function initAudio(){
   osc=audioCtx.createOscillator();osc.type='sine';gain=audioCtx.createGain();gain.gain.value=0;osc.connect(gain).connect(audioCtx.destination);osc.start();
 }
 
+/* ===== Pitch-Detection ===== */
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0;for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
@@ -185,6 +272,7 @@ function autoCorrelate(){
   const f=audioCtx.sampleRate/T0;if(f<50||f>2000||!isFinite(f))return-1;return f;
 }
 
+/* ===== UI ===== */
 function setStatus(m){statusDot.classList.remove("ready","live");if(m==="play")statusDot.classList.add("ready");if(m==="sing")statusDot.classList.add("live");}
 function showTargetBar(show,durMs=SING_MS){targetBar.classList.toggle("hidden",!show);if(show){targetBar.style.width="0%";targetBar.animate([{width:"0%"},{width:"100%"}],{duration:durMs,fill:"forwards",easing:"linear"});}}
 function resetFill(){fillEl.style.width="0%";}
@@ -202,7 +290,38 @@ function playTarget(freq,durMs=SING_MS){
 
 function pickRandomMidi(){return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI;}
 
-function runRound(){
+/* Challenge-Helfer */
+function challengeResetUI(){
+  challengeBody.innerHTML = "";
+  medalBox.style.display = "none";
+}
+function challengeAddRow(round, note, score){
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td>${round}.</td><td>${note}</td><td>${score} %</td>`;
+  challengeBody.appendChild(tr);
+}
+function challengeFinish(){
+  if(challengeResults.length === 0) return;
+  const avg = Math.round(challengeResults.reduce((s,r)=>s+r.score,0)/challengeResults.length);
+  let text = "Keine Medaille";
+  let emoji = "—";
+  if (avg >= 95){ text = "Gold"; emoji = "🥇"; }
+  else if (avg >= 85){ text = "Silber"; emoji = "🥈"; }
+  else if (avg >= 75){ text = "Bronze"; emoji = "🥉"; }
+
+  medalBox.style.display = "block";
+  medalBox.innerHTML = `<strong>Durchschnitt:</strong> ${avg} %<br><strong>Ergebnis:</strong> ${emoji} ${text}`;
+
+  startBtn.disabled = false;
+  stopBtn.disabled = true;
+  menBtn.disabled = false;
+  womenBtn.disabled = false;
+  modeFreeBtn.disabled = false;
+  modeChallengeBtn.disabled = false;
+}
+
+/* Freier Modus Runde */
+function runFreeRound(){
   currentMidi = pickRandomMidi();
   currentFreq = midiToFreq(currentMidi);
   targetNoteEl.textContent = midiToName(currentMidi);
@@ -214,16 +333,52 @@ function runRound(){
 
   cycleTimer = setTimeout(()=>{
     singPhase = false; setStatus("play"); showTargetBar(false);
-    roundScoreEl.textContent = Math.round((onTargetMs/SING_MS)*100) + " %";
+    roundScoreEl.textContent = Math.round((onTargetMs/SING_MS)*100)+" %";
 
     cycleTimer = setTimeout(()=>{
       setStatus("sing");
-      runRound();
+      runFreeRound();
     }, PAUSE_MS);
 
   }, SING_MS);
 }
 
+/* Challenge Runde */
+function runChallengeRound(){
+  if (challengeRound >= 10){
+    challengeFinish();
+    return;
+  }
+  challengeRound++;
+
+  currentMidi = pickRandomMidi();
+  currentFreq = midiToFreq(currentMidi);
+  targetNoteEl.textContent = midiToName(currentMidi);
+  targetFreqEl.textContent = currentFreq.toFixed(2)+" Hz";
+
+  setStatus("sing"); showTargetBar(true,SING_MS); resetFill();
+  playTarget(currentFreq,SING_MS);
+  singPhase = true; onTargetMs = 0; singStartTs = performance.now();
+
+  cycleTimer = setTimeout(()=>{
+    singPhase = false; setStatus("play"); showTargetBar(false);
+    const score = Math.round((onTargetMs/SING_MS)*100);
+    roundScoreEl.textContent = score+" %";
+    challengeResults.push({round: challengeRound, note: midiToName(currentMidi), score});
+    challengeAddRow(challengeRound, midiToName(currentMidi), score);
+
+    if (challengeRound >= 10){
+      challengeFinish();
+    } else {
+      cycleTimer = setTimeout(()=>{
+        runChallengeRound();
+      }, PAUSE_MS);
+    }
+
+  }, SING_MS);
+}
+
+/* Skala */
 function updateCentScale(cents){
   const marker = document.getElementById("centMarker");
   if(!marker) return;
@@ -233,6 +388,7 @@ function updateCentScale(cents){
   marker.setAttribute("points", `${x},${topY} ${x-6},${baseY} ${x+6},${baseY}`);
 }
 
+/* Loop */
 function loop(){
   const f=analyser?autoCorrelate():-1;
   if(f===-1){
@@ -246,9 +402,10 @@ function loop(){
     liveCentsEl.textContent=f.toFixed(1)+" Hz";
     document.getElementById("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
-    // HIER der Fix: einfach in festen Schritten hochzählen
     if(singPhase && currentFreq && Math.abs(cents)<=TOL){
-      onTargetMs = Math.min(SING_MS, onTargetMs + 16);
+      const now=performance.now();
+      const elapsed=now-(singStartTs+onTargetMs);
+      onTargetMs=Math.min(SING_MS, onTargetMs + Math.min(16, elapsed));
       setFill(onTargetMs, SING_MS);
     }
     updateCentScale(cents);
@@ -256,6 +413,7 @@ function loop(){
   rafId=requestAnimationFrame(loop);
 }
 
+/* Umschalter Tonlage */
 function setRange(key){
   rangeKey = key;
   RANGE_MIN_MIDI = RANGES[key].min;
@@ -266,18 +424,44 @@ function setRange(key){
 menBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setRange('men'); });
 womenBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setRange('women'); });
 
+/* Umschalter Modus */
+function setMode(newMode){
+  MODE = newMode;
+  modeFreeBtn.classList.toggle('active', newMode==='free');
+  modeChallengeBtn.classList.toggle('active', newMode==='challenge');
+  challengePanel.style.display = (newMode === 'challenge') ? 'block' : 'none';
+}
+modeFreeBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setMode('free'); });
+modeChallengeBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setMode('challenge'); });
+
+/* Start/Stop */
 async function start(){
   menBtn.disabled = true; womenBtn.disabled = true;
+  modeFreeBtn.disabled = true; modeChallengeBtn.disabled = true;
+
   startBtn.disabled=true;stopBtn.disabled=false;
-  try{if(!audioCtx)await initAudio();if(audioCtx.state==="suspended")await audioCtx.resume();}
-  catch(e){
+  try{
+    if(!audioCtx)await initAudio();
+    if(audioCtx.state==="suspended")await audioCtx.resume();
+  }catch(e){
     alert("Zugriff aufs Mikrofon fehlgeschlagen. Bitte Berechtigung erlauben.");
     startBtn.disabled=false;stopBtn.disabled=true;
     menBtn.disabled = false; womenBtn.disabled = false;
+    modeFreeBtn.disabled = false; modeChallengeBtn.disabled = false;
     return;
   }
-  runRound(); loop();
+
+  if (MODE === 'challenge'){
+    challengeRound = 0;
+    challengeResults = [];
+    challengeResetUI();
+    runChallengeRound();
+  } else {
+    runFreeRound();
+  }
+  loop();
 }
+
 function stop(){
   startBtn.disabled=false;stopBtn.disabled=true;
   if(rafId) cancelAnimationFrame(rafId);
@@ -286,7 +470,9 @@ function stop(){
   livePitchEl.textContent="–";liveCentsEl.textContent="–";roundScoreEl.textContent="–";
   targetNoteEl.textContent="–";targetFreqEl.textContent="– Hz";
   if(gain&&audioCtx) gain.gain.setValueAtTime(0,audioCtx.currentTime);
+
   menBtn.disabled = false; womenBtn.disabled = false;
+  modeFreeBtn.disabled = false; modeChallengeBtn.disabled = false;
 }
 startBtn.addEventListener("click",start);
 stopBtn.addEventListener("click",stop);
