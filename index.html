@@ -35,13 +35,11 @@
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
     footer{padding:0 22px 12px;color:var(--muted);font-size:12px}
 
-    /* Segment-Schalter */
     .seg { display:flex; background:#111528; border:1px solid #202545; border-radius:12px; overflow:hidden }
     .seg button { background:transparent; border:0; padding:8px 14px; font-weight:700; color:#b7bee6; cursor:pointer; }
     .seg button.active { background:#223060; color:#fff; }
     .seg button:disabled { opacity:.55; cursor:not-allowed; }
 
-    /* Skala unter dem Highway */
     .scale-container {
       display:flex;
       justify-content:center;
@@ -52,7 +50,6 @@
     svg#centScale { width: 320px; height: 54px; }
     .scale-label { font-size: 10px; fill: #b7bee6; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
 
-    /* Challenge-Panel */
     #challengePanel {
       background:#111528;
       border:1px solid #202545;
@@ -84,7 +81,6 @@
       display:none;
     }
 
-    /* Datenschutz */
     #privacy {
       background:#0d1124;
       border-top:1px solid #1a1f3e;
@@ -108,17 +104,14 @@
       <h1>Vokal-Intonations-Trainer <span style="opacity:.6;font-weight:600">(Guitar-Hero-Modus)</span></h1>
 
       <div class="controls">
-        <!-- Modus -->
         <div class="seg" title="Modus wählen">
           <button id="modeFreeBtn" class="active">Freier Modus</button>
           <button id="modeChallengeBtn">Challenge</button>
         </div>
-        <!-- Tonlage -->
         <div class="seg" title="Tonlage wählen">
           <button id="menBtn" class="active">Männer</button>
           <button id="womenBtn">Frauen</button>
         </div>
-        <!-- Start/Stop -->
         <button class="primary" id="startBtn">Start</button>
         <button class="danger" id="stopBtn" disabled>Stopp</button>
       </div>
@@ -149,7 +142,6 @@
           <div class="fill" id="fill"></div>
         </div>
 
-        <!-- Skala ±100 Cent -->
         <div class="scale-container">
           <svg id="centScale" viewBox="0 0 320 54" preserveAspectRatio="xMidYMid meet">
             <line x1="10" y1="20" x2="310" y2="20" stroke="#2a335f" stroke-width="2"/>
@@ -158,7 +150,7 @@
               <line x1="10"  y1="16" x2="10"  y2="24"/>
               <line x1="85"  y1="18" x2="85"  y2="22"/>
               <line x1="160" y1="10" x2="160" y2="30" stroke="#bcd0ff"/>
-              <line x1="235" y1="18" x2="235" y2="22"/>
+              <line x1="235" y1="18" x2="235"  y2="22"/>
               <line x1="260" y1="16" x2="260" y2="24"/>
               <line x1="310" y1="16" x2="310" y2="24"/>
             </g>
@@ -175,7 +167,6 @@
         </div>
       </section>
 
-      <!-- Challenge-Ausgabe -->
       <section id="challengePanel">
         <h3>Challenge-Läufe</h3>
         <table id="challengeTable">
@@ -195,15 +186,15 @@
 
     <footer>
       <p><strong>Hinweis:</strong> Freier Modus läuft durchgehend. Im Challenge-Modus werden 10 Runden gespielt und danach eine Medaille vergeben.</p>
+      <p><strong>Wichtig:</strong> Bitte am Handy immer mit Kopfhörern nutzen, damit der abgespielte Ton nicht ins Mikro gelangt.</p>
     </footer>
 
-    <!-- Datenschutz-Hinweis -->
     <section id="privacy">
       <h3>Datenschutz-Hinweis – Mikrofonzugriff</h3>
       <p>Diese Anwendung nutzt den Zugriff auf das Mikrofon Ihres Endgeräts ausschließlich zur lokalen Tonhöhenanalyse während der Nutzung.</p>
       <p>Die aufgenommenen Audiodaten werden nicht gespeichert, nicht übertragen und nicht an Dritte weitergegeben. Die gesamte Verarbeitung der Tonsignale erfolgt ausschließlich innerhalb Ihres Webbrowsers (lokal auf Ihrem Gerät).</p>
       <p>Erst nach Ihrer ausdrücklichen Zustimmung („Mikrofon erlauben“) beginnt die Analyse. Sie können den Mikrofonzugriff jederzeit in den Einstellungen Ihres Browsers widerrufen.</p>
-      <p>Diese Seite kann über GitHub Pages bereitgestellt werden. Beim Aufruf der Seite werden technisch bedingt Zugriffsdaten (z. B. IP-Adresse, Zeitpunkt, Browser) vom Hosting-Anbieter verarbeitet. Weitere Informationen finden Sie in der Datenschutzerklärung des Anbieters.</p>
+      <p>Diese Seite kann über GitHub Pages bereitgestellt werden. Beim Aufruf der Seite werden technisch bedingt Zugriffsdaten (z. B. IP-Adresse, Zeitpunkt, Browser) vom Hosting-Anbieter verarbeitet.</p>
     </section>
   </div>
 
@@ -230,14 +221,14 @@ let cycleTimer=null;
 
 /* Modus & Bereich */
 const RANGES = {
-  men:   {min:45, max:60},   // A2–C4
-  women: {min:57, max:72}    // A3–C5
+  men:   {min:45, max:60},
+  women: {min:57, max:72}
 };
 let rangeKey = "men";
 let RANGE_MIN_MIDI = RANGES[rangeKey].min;
 let RANGE_MAX_MIDI = RANGES[rangeKey].max;
 
-let MODE = "free"; // "free" oder "challenge"
+let MODE = "free";
 
 const TOL=30;
 const SING_MS=6000, PAUSE_MS=3000;
@@ -251,10 +242,21 @@ let challengeResults = [];
 /* ===== Audio initialisieren ===== */
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},video:false});
+  // Kopfhörer-Szenario: roh aufnehmen
+  micStream=await navigator.mediaDevices.getUserMedia({
+    audio:{
+      echoCancellation:false,
+      noiseSuppression:false,
+      autoGainControl:false
+    },
+    video:false
+  });
   micSource=audioCtx.createMediaStreamSource(micStream);
   analyser=audioCtx.createAnalyser();analyser.fftSize=2048;micSource.connect(analyser);
-  osc=audioCtx.createOscillator();osc.type='sine';gain=audioCtx.createGain();gain.gain.value=0;osc.connect(gain).connect(audioCtx.destination);osc.start();
+  osc=audioCtx.createOscillator();osc.type='sine';
+  gain=audioCtx.createGain();gain.gain.value=0;
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
 }
 
 /* ===== Pitch-Detection ===== */
@@ -278,13 +280,14 @@ function showTargetBar(show,durMs=SING_MS){targetBar.classList.toggle("hidden",!
 function resetFill(){fillEl.style.width="0%";}
 function setFill(ms,totalMs){fillEl.style.width=Math.max(0,Math.min(100,(ms/totalMs)*100))+"%";}
 
+/* Ton abspielen – lauter für Handy + Kopfhörer */
 function playTarget(freq,durMs=SING_MS){
   const t=audioCtx.currentTime;
   gain.gain.cancelScheduledValues(t);
   gain.gain.setValueAtTime(0,t);
   osc.frequency.setValueAtTime(freq,t);
-  gain.gain.linearRampToValueAtTime(0.18,t+0.03);
-  gain.gain.setValueAtTime(0.18,t+durMs/1000-0.05);
+  gain.gain.linearRampToValueAtTime(0.3,t+0.03);
+  gain.gain.setValueAtTime(0.3,t+durMs/1000-0.05);
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
