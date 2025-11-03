@@ -35,13 +35,11 @@
     .dot{width:10px;height:10px;border-radius:999px;display:inline-block;margin-right:6px}
     footer{padding:0 22px 12px;color:var(--muted);font-size:12px}
 
-    /* Segment-Schalter */
     .seg { display:flex; background:#111528; border:1px solid #202545; border-radius:12px; overflow:hidden }
     .seg button { background:transparent; border:0; padding:8px 14px; font-weight:700; color:#b7bee6; cursor:pointer; }
     .seg button.active { background:#223060; color:#fff; }
     .seg button:disabled { opacity:.55; cursor:not-allowed; }
 
-    /* Skala unter dem Highway */
     .scale-container {
       display:flex;
       justify-content:center;
@@ -52,7 +50,6 @@
     svg#centScale { width: 320px; height: 54px; }
     .scale-label { font-size: 10px; fill: #b7bee6; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
 
-    /* Challenge-Panel */
     #challengePanel {
       background:#111528;
       border:1px solid #202545;
@@ -73,7 +70,6 @@
       display:none;
     }
 
-    /* Datenschutz */
     #privacy {
       background:#0d1124;
       border-top:1px solid #1a1f3e;
@@ -97,17 +93,14 @@
       <h1>Vokal-Intonations-Trainer <span style="opacity:.6;font-weight:600">(Guitar-Hero-Modus)</span></h1>
 
       <div class="controls">
-        <!-- Modus -->
         <div class="seg" title="Modus wählen">
           <button id="modeFreeBtn" class="active">Freier Modus</button>
           <button id="modeChallengeBtn">Challenge</button>
         </div>
-        <!-- Tonlage -->
         <div class="seg" title="Tonlage wählen">
           <button id="menBtn" class="active">Männer</button>
           <button id="womenBtn">Frauen</button>
         </div>
-        <!-- Start/Stop -->
         <button class="primary" id="startBtn">Start</button>
         <button class="danger" id="stopBtn" disabled>Stopp</button>
       </div>
@@ -208,34 +201,36 @@ const statusDot=$("statusDot"),targetBar=$("targetBar"),fillEl=$("fill");
 const challengePanel=$("challengePanel"),challengeBody=$("challengeBody"),medalBox=$("medalBox");
 
 let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
-let singPhase=false,onTargetMs=0,singStartTs=0,currentMidi=null,currentFreq=null;
+let singPhase=false,onTargetMs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
-let listenUnlockTs=0;          // <--- NEU: ab wann wir singen zählen
-const MIN_SING_RMS = 0.035;    // <--- NEU: Mindestlautstärke
+let listenUnlockTs=0;
+
+const MIN_SING_RMS = 0.02;  // etwas niedriger
+const IGNORE_MS = 500;      // 0,5s nach Start ignorieren
 
 const RANGES = {
   men:   {min:45, max:60},   // A2–C4
   women: {min:57, max:72}    // A3–C5
 };
-let rangeKey = "men";
-let RANGE_MIN_MIDI = RANGES[rangeKey].min;
-let RANGE_MAX_MIDI = RANGES[rangeKey].max;
-let MODE = "free";
+let rangeKey="men";
+let RANGE_MIN_MIDI=RANGES[rangeKey].min;
+let RANGE_MAX_MIDI=RANGES[rangeKey].max;
+let MODE="free";
+
 const TOL=30;
 const SING_MS=6000, PAUSE_MS=3000;
-
 const bufLen=2048,buf=new Float32Array(bufLen);
 
-let challengeRound = 0;
-let challengeResults = [];
+let challengeRound=0;
+let challengeResults=[];
 
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   micStream=await navigator.mediaDevices.getUserMedia({
     audio:{
-      echoCancellation:true,
-      noiseSuppression:true,
-      autoGainControl:true
+      echoCancellation:false,
+      noiseSuppression:false,
+      autoGainControl:false
     },
     video:false
   });
@@ -244,12 +239,11 @@ async function initAudio(){
   osc=audioCtx.createOscillator();osc.type='sine';gain=audioCtx.createGain();gain.gain.value=0;osc.connect(gain).connect(audioCtx.destination);osc.start();
 }
 
-/* jetzt freq + rms zurückgeben */
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0;for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
   rms=Math.sqrt(rms/bufLen);
-  if(rms<0.01)return {freq:-1, rms};
+  if(rms<0.01)return {freq:-1,rms};
   let r1=0,r2=bufLen-1,th=0.2;
   for(let i=0;i<bufLen/2;i++)if(Math.abs(buf[i])<th){r1=i;break;}
   for(let i=1;i<bufLen/2;i++)if(Math.abs(buf[bufLen-i])<th){r2=bufLen-i;break;}
@@ -258,8 +252,8 @@ function autoCorrelate(){
   let d=0;while(c[d]>c[d+1])d++;let maxval=-1,maxpos=-1;for(let i=d;i<size;i++)if(c[i]>maxval){maxval=c[i];maxpos=i;}
   let T0=maxpos;const x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;if(a)T0=T0-b/(2*a);
   const f=audioCtx.sampleRate/T0;
-  if(f<50||f>2000||!isFinite(f))return {freq:-1, rms};
-  return {freq:f, rms};
+  if(f<50||f>2000||!isFinite(f))return {freq:-1,rms};
+  return {freq:f,rms};
 }
 
 function setStatus(m){statusDot.classList.remove("ready","live");if(m==="play")statusDot.classList.add("ready");if(m==="sing")statusDot.classList.add("live");}
@@ -280,71 +274,58 @@ function playTarget(freq,durMs=SING_MS){
 function pickRandomMidi(){return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI;}
 
 function challengeResetUI(){challengeBody.innerHTML="";medalBox.style.display="none";}
-function challengeAddRow(round, note, score){
+function challengeAddRow(round,note,score){
   const tr=document.createElement("tr");
   tr.innerHTML=`<td>${round}.</td><td>${note}</td><td>${score} %</td>`;
   challengeBody.appendChild(tr);
 }
 function challengeFinish(){
-  if(challengeResults.length===0)return;
+  if(!challengeResults.length)return;
   const avg=Math.round(challengeResults.reduce((s,r)=>s+r.score,0)/challengeResults.length);
   let text="Keine Medaille",emoji="—";
   if(avg>=95){text="Gold";emoji="🥇";}
   else if(avg>=85){text="Silber";emoji="🥈";}
   else if(avg>=75){text="Bronze";emoji="🥉";}
-
   medalBox.style.display="block";
   medalBox.innerHTML=`<strong>Durchschnitt:</strong> ${avg} %<br><strong>Ergebnis:</strong> ${emoji} ${text}`;
-
-  startBtn.disabled=false;
-  stopBtn.disabled=true;
-  menBtn.disabled=false; womenBtn.disabled=false;
-  modeFreeBtn.disabled=false; modeChallengeBtn.disabled=false;
+  startBtn.disabled=false;stopBtn.disabled=true;
+  menBtn.disabled=false;womenBtn.disabled=false;
+  modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
 }
 
 function runFreeRound(){
-  currentMidi=pickRandomMidi();
-  currentFreq=midiToFreq(currentMidi);
+  currentMidi=pickRandomMidi();currentFreq=midiToFreq(currentMidi);
   targetNoteEl.textContent=midiToName(currentMidi);
   targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
-
-  setStatus("sing"); showTargetBar(true,SING_MS); resetFill();
+  setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase=true; onTargetMs=0; singStartTs=performance.now();
-  listenUnlockTs = performance.now() + 500; // 500ms nichts werten
+  singPhase=true;onTargetMs=0;
+  listenUnlockTs = performance.now() + IGNORE_MS;
 
   cycleTimer=setTimeout(()=>{
-    singPhase=false; setStatus("play"); showTargetBar(false);
+    singPhase=false;setStatus("play");showTargetBar(false);
     roundScoreEl.textContent=Math.round((onTargetMs/SING_MS)*100)+" %";
-
-    cycleTimer=setTimeout(()=>{
-      setStatus("sing");
-      runFreeRound();
-    },PAUSE_MS);
+    cycleTimer=setTimeout(()=>{setStatus("sing");runFreeRound();},PAUSE_MS);
   },SING_MS);
 }
 
 function runChallengeRound(){
   if(challengeRound>=10){challengeFinish();return;}
   challengeRound++;
-
-  currentMidi=pickRandomMidi();
-  currentFreq=midiToFreq(currentMidi);
+  currentMidi=pickRandomMidi();currentFreq=midiToFreq(currentMidi);
   targetNoteEl.textContent=midiToName(currentMidi);
   targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
-
-  setStatus("sing"); showTargetBar(true,SING_MS); resetFill();
+  setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase=true; onTargetMs=0; singStartTs=performance.now();
-  listenUnlockTs = performance.now() + 500;
+  singPhase=true;onTargetMs=0;
+  listenUnlockTs = performance.now() + IGNORE_MS;
 
   cycleTimer=setTimeout(()=>{
-    singPhase=false; setStatus("play"); showTargetBar(false);
+    singPhase=false;setStatus("play");showTargetBar(false);
     const score=Math.round((onTargetMs/SING_MS)*100);
     roundScoreEl.textContent=score+" %";
-    challengeResults.push({round:challengeRound, note:midiToName(currentMidi), score});
-    challengeAddRow(challengeRound, midiToName(currentMidi), score);
-
+    challengeResults.push({round:challengeRound,note:midiToName(currentMidi),score});
+    challengeAddRow(challengeRound,midiToName(currentMidi),score);
     if(challengeRound>=10){
       challengeFinish();
     }else{
@@ -378,13 +359,9 @@ function loop(){
 
     if(singPhase && currentFreq){
       const now=performance.now();
-      const close = Math.abs(cents)<=TOL;
-      const loudEnough = rms > MIN_SING_RMS;
-      const unlocked = now > listenUnlockTs;
-      if(close && loudEnough && unlocked){
-        const elapsed=now-(singStartTs+onTargetMs);
-        onTargetMs=Math.min(SING_MS,onTargetMs+Math.min(16,elapsed));
-        setFill(onTargetMs,SING_MS);
+      if(now > listenUnlockTs && Math.abs(cents)<=TOL && rms >= MIN_SING_RMS){
+        onTargetMs = Math.min(SING_MS, onTargetMs + 16);  // stabiler Anstieg
+        setFill(onTargetMs, SING_MS);
       }
     }
     updateCentScale(cents);
@@ -412,24 +389,22 @@ modeFreeBtn.addEventListener('click',()=>{if(startBtn.disabled)return;setMode('f
 modeChallengeBtn.addEventListener('click',()=>{if(startBtn.disabled)return;setMode('challenge');});
 
 async function start(){
-  menBtn.disabled=true; womenBtn.disabled=true;
-  modeFreeBtn.disabled=true; modeChallengeBtn.disabled=true;
-  startBtn.disabled=true; stopBtn.disabled=false;
+  menBtn.disabled=true;womenBtn.disabled=true;
+  modeFreeBtn.disabled=true;modeChallengeBtn.disabled=true;
+  startBtn.disabled=true;stopBtn.disabled=false;
   try{
     if(!audioCtx)await initAudio();
     if(audioCtx.state==="suspended")await audioCtx.resume();
   }catch(e){
     alert("Zugriff aufs Mikrofon fehlgeschlagen. Bitte Berechtigung erlauben.");
-    startBtn.disabled=false; stopBtn.disabled=true;
-    menBtn.disabled=false; womenBtn.disabled=false;
-    modeFreeBtn.disabled=false; modeChallengeBtn.disabled=false;
+    startBtn.disabled=false;stopBtn.disabled=true;
+    menBtn.disabled=false;womenBtn.disabled=false;
+    modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
     return;
   }
 
   if(MODE==='challenge'){
-    challengeRound=0;
-    challengeResults=[];
-    challengeResetUI();
+    challengeRound=0;challengeResults=[];challengeResetUI();
     runChallengeRound();
   }else{
     runFreeRound();
@@ -445,9 +420,8 @@ function stop(){
   livePitchEl.textContent="–";liveCentsEl.textContent="–";roundScoreEl.textContent="–";
   targetNoteEl.textContent="–";targetFreqEl.textContent="– Hz";
   if(gain&&audioCtx)gain.gain.setValueAtTime(0,audioCtx.currentTime);
-
-  menBtn.disabled=false; womenBtn.disabled=false;
-  modeFreeBtn.disabled=false; modeChallengeBtn.disabled=false;
+  menBtn.disabled=false;womenBtn.disabled=false;
+  modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
 }
 startBtn.addEventListener("click",start);
 stopBtn.addEventListener("click",stop);
