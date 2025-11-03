@@ -169,7 +169,11 @@ let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
 
-const RANGES={ men:{min:45,max:60}, women:{min:57,max:72} };
+// Männer jetzt: kleines c (MIDI 48) bis eingestrichenes c (MIDI 60)
+const RANGES={
+  men:{min:48, max:60},
+  women:{min:57, max:72}
+};
 let rangeKey="men";
 let RANGE_MIN_MIDI=RANGES[rangeKey].min;
 let RANGE_MAX_MIDI=RANGES[rangeKey].max;
@@ -179,7 +183,7 @@ const TOL=30;
 const SING_MS=6000,PAUSE_MS=3000;
 const bufLen=2048,buf=new Float32Array(bufLen);
 
-// für Challenge
+// Challenge
 let challengeRound=0;
 let challengeResults=[];
 
@@ -188,8 +192,8 @@ let lastPitchHz=null;
 let lastPitchTs=0;
 const PITCH_HOLD_MS=120;
 
-// für Zählung: nur wenn wirklich gesungen wird
-const COUNT_RMS_MIN = 0.004;  // lauter als reine Erkennung
+// zum Zählen lauter
+const COUNT_RMS_MIN=0.004;
 
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
@@ -201,22 +205,21 @@ async function initAudio(){
   analyser=audioCtx.createAnalyser();
   analyser.fftSize=2048;
   micSource.connect(analyser);
+
   osc=audioCtx.createOscillator();
-  osc.type='sine';
+  osc.type='square';             // LAUTER
   gain=audioCtx.createGain();
   gain.gain.value=0;
   osc.connect(gain).connect(audioCtx.destination);
   osc.start();
 }
 
-// gibt jetzt {freq, rms}, freq = -1 wenn nix
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
   let rms=0;
-  for(let i=0;i<bufLen;i++) rms+=buf[i]*buf[i];
+  for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
   rms=Math.sqrt(rms/bufLen);
-  // sehr empfindlich, aber nicht 0
-  if(rms<0.0015) return {freq:-1, rms};
+  if(rms<0.0015) return {freq:-1,rms};
   let r1=0,r2=bufLen-1,th=0.2;
   for(let i=0;i<bufLen/2;i++) if(Math.abs(buf[i])<th){r1=i;break;}
   for(let i=1;i<bufLen/2;i++) if(Math.abs(buf[bufLen-i])<th){r2=bufLen-i;break;}
@@ -228,10 +231,10 @@ function autoCorrelate(){
   let T0=maxpos;
   const x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;
   const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;
-  if(a) T0 = T0 - b/(2*a);
+  if(a) T0=T0-b/(2*a);
   const f=audioCtx.sampleRate/T0;
   if(f<50||f>2000||!isFinite(f)) return {freq:-1,rms};
-  return {freq:f, rms};
+  return {freq:f,rms};
 }
 
 function setStatus(m){
@@ -254,9 +257,8 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.cancelScheduledValues(t);
   gain.gain.setValueAtTime(0,t);
   osc.frequency.setValueAtTime(freq,t);
-  // sehr laut (für Kopfhörer)
-  gain.gain.linearRampToValueAtTime(0.8,t+0.03);
-  gain.gain.setValueAtTime(0.8,t+durMs/1000-0.05);
+  gain.gain.linearRampToValueAtTime(1.0,t+0.03);     // MAX
+  gain.gain.setValueAtTime(1.0,t+durMs/1000-0.05);
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
@@ -340,12 +342,10 @@ function loop(){
   let rms=r.rms;
   let fresh=true;
 
-  // wenn kein aktueller Ton, aber sehr kurz her → für Anzeige halten
-  if(f===-1 && lastPitchHz && (now - lastPitchTs) < PITCH_HOLD_MS){
+  if(f===-1 && lastPitchHz && (now - lastPitchTs) < 120){
     f = lastPitchHz;
-    // aber: nicht frisch, also nicht zum Auffüllen benutzen
     fresh = false;
-  } else if (f !== -1){
+  } else if(f !== -1){
     lastPitchHz = f;
     lastPitchTs = now;
   }
@@ -361,7 +361,6 @@ function loop(){
     liveCentsEl.textContent=f.toFixed(1)+" Hz";
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
-    // nur zählen, wenn tatsächlich frische Messung UND laut genug UND in Toleranz
     if(fresh && singPhase && currentFreq && Math.abs(cents)<=TOL && rms >= COUNT_RMS_MIN){
       onTargetMs = Math.min(SING_MS, onTargetMs + 16);
       setFill(onTargetMs, SING_MS);
