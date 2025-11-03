@@ -57,20 +57,9 @@
       padding:14px;
       display:none;
     }
-    #challengePanel h3 {
-      margin:0 0 10px 0;
-      font-size:14px;
-    }
-    #challengeTable {
-      width:100%;
-      border-collapse:collapse;
-      font-size:13px;
-    }
-    #challengeTable th, #challengeTable td {
-      border-bottom:1px solid rgba(255,255,255,0.03);
-      padding:6px 4px;
-      text-align:left;
-    }
+    #challengePanel h3 { margin:0 0 10px 0; font-size:14px; }
+    #challengeTable { width:100%; border-collapse:collapse; font-size:13px; }
+    #challengeTable th, #challengeTable td { border-bottom:1px solid rgba(255,255,255,0.03); padding:6px 4px; text-align:left; }
     #challengeTable th { color:#b7bee6; font-weight:600; }
     #medalBox {
       margin-top:10px;
@@ -150,7 +139,7 @@
               <line x1="10"  y1="16" x2="10"  y2="24"/>
               <line x1="85"  y1="18" x2="85"  y2="22"/>
               <line x1="160" y1="10" x2="160" y2="30" stroke="#bcd0ff"/>
-              <line x1="235" y1="18" x2="235"  y2="22"/>
+              <line x1="235" y1="18" x2="235" y2="22"/>
               <line x1="260" y1="16" x2="260" y2="24"/>
               <line x1="310" y1="16" x2="310" y2="24"/>
             </g>
@@ -177,8 +166,7 @@
               <th>Ergebnis</th>
             </tr>
           </thead>
-          <tbody id="challengeBody">
-          </tbody>
+          <tbody id="challengeBody"></tbody>
         </table>
         <div id="medalBox"></div>
       </section>
@@ -186,26 +174,22 @@
 
     <footer>
       <p><strong>Hinweis:</strong> Freier Modus läuft durchgehend. Im Challenge-Modus werden 10 Runden gespielt und danach eine Medaille vergeben.</p>
-      <p><strong>Wichtig:</strong> Bitte am Handy immer mit Kopfhörern nutzen, damit der abgespielte Ton nicht ins Mikro gelangt.</p>
+      <p><strong>Wichtig:</strong> Am Handy immer mit Kopfhörern nutzen.</p>
     </footer>
 
     <section id="privacy">
       <h3>Datenschutz-Hinweis – Mikrofonzugriff</h3>
       <p>Diese Anwendung nutzt den Zugriff auf das Mikrofon Ihres Endgeräts ausschließlich zur lokalen Tonhöhenanalyse während der Nutzung.</p>
-      <p>Die aufgenommenen Audiodaten werden nicht gespeichert, nicht übertragen und nicht an Dritte weitergegeben. Die gesamte Verarbeitung der Tonsignale erfolgt ausschließlich innerhalb Ihres Webbrowsers (lokal auf Ihrem Gerät).</p>
-      <p>Erst nach Ihrer ausdrücklichen Zustimmung („Mikrofon erlauben“) beginnt die Analyse. Sie können den Mikrofonzugriff jederzeit in den Einstellungen Ihres Browsers widerrufen.</p>
-      <p>Diese Seite kann über GitHub Pages bereitgestellt werden. Beim Aufruf der Seite werden technisch bedingt Zugriffsdaten (z. B. IP-Adresse, Zeitpunkt, Browser) vom Hosting-Anbieter verarbeitet.</p>
+      <p>Die aufgenommenen Audiodaten werden nicht gespeichert, nicht übertragen und nicht an Dritte weitergegeben. Die gesamte Verarbeitung erfolgt lokal im Browser.</p>
     </section>
   </div>
 
 <script>
-/* ===== Musik-Utils ===== */
 const A4=440,A4_MIDI=69,NOTE_NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const midiToFreq=m=>A4*Math.pow(2,(m-A4_MIDI)/12);
 const freqToMidi=f=>12*(Math.log2(f/A4))+A4_MIDI;
 const midiToName=m=>{const r=Math.round(m);return NOTE_NAMES[r%12]+(Math.floor(r/12)-1);}
 
-/* ===== DOM ===== */
 const $=id=>document.getElementById(id);
 const startBtn=$("startBtn"),stopBtn=$("stopBtn");
 const menBtn=$("menBtn"),womenBtn=$("womenBtn");
@@ -219,7 +203,6 @@ let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,singStartTs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
 
-/* Modus & Bereich */
 const RANGES = {
   men:   {min:45, max:60},
   women: {min:57, max:72}
@@ -235,52 +218,65 @@ const SING_MS=6000, PAUSE_MS=3000;
 
 const bufLen=2048,buf=new Float32Array(bufLen);
 
-/* Challenge-Variablen */
 let challengeRound = 0;
 let challengeResults = [];
 
-/* ===== Audio initialisieren ===== */
 async function initAudio(){
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  // Kopfhörer-Szenario: roh aufnehmen
   micStream=await navigator.mediaDevices.getUserMedia({
-    audio:{
-      echoCancellation:false,
-      noiseSuppression:false,
-      autoGainControl:false
-    },
+    audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
     video:false
   });
   micSource=audioCtx.createMediaStreamSource(micStream);
-  analyser=audioCtx.createAnalyser();analyser.fftSize=2048;micSource.connect(analyser);
-  osc=audioCtx.createOscillator();osc.type='sine';
-  gain=audioCtx.createGain();gain.gain.value=0;
+  analyser=audioCtx.createAnalyser();
+  analyser.fftSize=2048;
+  micSource.connect(analyser);
+  osc=audioCtx.createOscillator();
+  osc.type='sine';
+  gain=audioCtx.createGain();
+  gain.gain.value=0;
   osc.connect(gain).connect(audioCtx.destination);
   osc.start();
 }
 
-/* ===== Pitch-Detection ===== */
 function autoCorrelate(){
   analyser.getFloatTimeDomainData(buf);
-  let rms=0;for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
-  rms=Math.sqrt(rms/bufLen);if(rms<0.01)return-1;
+  let rms=0;
+  for(let i=0;i<bufLen;i++)rms+=buf[i]*buf[i];
+  rms=Math.sqrt(rms/bufLen);
+  if(rms<0.01)return-1;
   let r1=0,r2=bufLen-1,th=0.2;
   for(let i=0;i<bufLen/2;i++)if(Math.abs(buf[i])<th){r1=i;break;}
   for(let i=1;i<bufLen/2;i++)if(Math.abs(buf[bufLen-i])<th){r2=bufLen-i;break;}
   const trimmed=buf.slice(r1,r2),size=trimmed.length,c=new Array(size).fill(0);
   for(let i=0;i<size;i++){for(let j=0;j<size-i;j++)c[i]+=trimmed[j]*trimmed[j+i];}
-  let d=0;while(c[d]>c[d+1])d++;let maxval=-1,maxpos=-1;for(let i=d;i<size;i++)if(c[i]>maxval){maxval=c[i];maxpos=i;}
-  let T0=maxpos;const x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;if(a)T0=T0-b/(2*a);
-  const f=audioCtx.sampleRate/T0;if(f<50||f>2000||!isFinite(f))return-1;return f;
+  let d=0;while(c[d]>c[d+1])d++;
+  let maxval=-1,maxpos=-1;
+  for(let i=d;i<size;i++)if(c[i]>maxval){maxval=c[i];maxpos=i;}
+  let T0=maxpos;
+  const x1=c[T0-1]||0,x2=c[T0]||0,x3=c[T0+1]||0;
+  const a=(x1+x3-2*x2)/2,b=(x3-x1)/2;
+  if(a)T0=T0-b/(2*a);
+  const f=audioCtx.sampleRate/T0;
+  if(f<50||f>2000||!isFinite(f))return-1;
+  return f;
 }
 
-/* ===== UI ===== */
-function setStatus(m){statusDot.classList.remove("ready","live");if(m==="play")statusDot.classList.add("ready");if(m==="sing")statusDot.classList.add("live");}
-function showTargetBar(show,durMs=SING_MS){targetBar.classList.toggle("hidden",!show);if(show){targetBar.style.width="0%";targetBar.animate([{width:"0%"},{width:"100%"}],{duration:durMs,fill:"forwards",easing:"linear"});}}
+function setStatus(m){
+  statusDot.classList.remove("ready","live");
+  if(m==="play")statusDot.classList.add("ready");
+  if(m==="sing")statusDot.classList.add("live");
+}
+function showTargetBar(show,durMs=SING_MS){
+  targetBar.classList.toggle("hidden",!show);
+  if(show){
+    targetBar.style.width="0%";
+    targetBar.animate([{width:"0%"},{width:"100%"}],{duration:durMs,fill:"forwards",easing:"linear"});
+  }
+}
 function resetFill(){fillEl.style.width="0%";}
 function setFill(ms,totalMs){fillEl.style.width=Math.max(0,Math.min(100,(ms/totalMs)*100))+"%";}
 
-/* Ton abspielen – lauter für Handy + Kopfhörer */
 function playTarget(freq,durMs=SING_MS){
   const t=audioCtx.currentTime;
   gain.gain.cancelScheduledValues(t);
@@ -291,9 +287,10 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
-function pickRandomMidi(){return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI;}
+function pickRandomMidi(){
+  return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI;
+}
 
-/* Challenge-Helfer */
 function challengeResetUI(){
   challengeBody.innerHTML = "";
   medalBox.style.display = "none";
@@ -323,7 +320,6 @@ function challengeFinish(){
   modeChallengeBtn.disabled = false;
 }
 
-/* Freier Modus Runde */
 function runFreeRound(){
   currentMidi = pickRandomMidi();
   currentFreq = midiToFreq(currentMidi);
@@ -338,15 +334,10 @@ function runFreeRound(){
     singPhase = false; setStatus("play"); showTargetBar(false);
     roundScoreEl.textContent = Math.round((onTargetMs/SING_MS)*100)+" %";
 
-    cycleTimer = setTimeout(()=>{
-      setStatus("sing");
-      runFreeRound();
-    }, PAUSE_MS);
-
+    cycleTimer = setTimeout(()=>{ setStatus("sing"); runFreeRound(); }, PAUSE_MS);
   }, SING_MS);
 }
 
-/* Challenge Runde */
 function runChallengeRound(){
   if (challengeRound >= 10){
     challengeFinish();
@@ -373,15 +364,12 @@ function runChallengeRound(){
     if (challengeRound >= 10){
       challengeFinish();
     } else {
-      cycleTimer = setTimeout(()=>{
-        runChallengeRound();
-      }, PAUSE_MS);
+      cycleTimer = setTimeout(()=>{ runChallengeRound(); }, PAUSE_MS);
     }
 
   }, SING_MS);
 }
 
-/* Skala */
 function updateCentScale(cents){
   const marker = document.getElementById("centMarker");
   if(!marker) return;
@@ -391,32 +379,30 @@ function updateCentScale(cents){
   marker.setAttribute("points", `${x},${topY} ${x-6},${baseY} ${x+6},${baseY}`);
 }
 
-/* Loop */
 function loop(){
   const f=analyser?autoCorrelate():-1;
   if(f===-1){
     livePitchEl.textContent="–";liveCentsEl.textContent="–";
-    document.getElementById("deltaText").textContent="Δ: –";
+    $("deltaText").textContent="Δ: –";
     updateCentScale(0);
   }else{
     const name=midiToName(freqToMidi(f));
     const cents=currentFreq?(1200*Math.log2(f/currentFreq)):0;
     livePitchEl.textContent=name;
     liveCentsEl.textContent=f.toFixed(1)+" Hz";
-    document.getElementById("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
+    $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
+    // FIX für Handy: einfach immer in kleinen Schritten hochzählen
     if(singPhase && currentFreq && Math.abs(cents)<=TOL){
-      const now=performance.now();
-      const elapsed=now-(singStartTs+onTargetMs);
-      onTargetMs=Math.min(SING_MS, onTargetMs + Math.min(16, elapsed));
+      onTargetMs = Math.min(SING_MS, onTargetMs + 16);
       setFill(onTargetMs, SING_MS);
     }
+
     updateCentScale(cents);
   }
   rafId=requestAnimationFrame(loop);
 }
 
-/* Umschalter Tonlage */
 function setRange(key){
   rangeKey = key;
   RANGE_MIN_MIDI = RANGES[key].min;
@@ -427,7 +413,6 @@ function setRange(key){
 menBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setRange('men'); });
 womenBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setRange('women'); });
 
-/* Umschalter Modus */
 function setMode(newMode){
   MODE = newMode;
   modeFreeBtn.classList.toggle('active', newMode==='free');
@@ -437,7 +422,6 @@ function setMode(newMode){
 modeFreeBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setMode('free'); });
 modeChallengeBtn.addEventListener('click', ()=>{ if(startBtn.disabled) return; setMode('challenge'); });
 
-/* Start/Stop */
 async function start(){
   menBtn.disabled = true; womenBtn.disabled = true;
   modeFreeBtn.disabled = true; modeChallengeBtn.disabled = true;
