@@ -177,8 +177,8 @@ let RANGE_MIN_MIDI=RANGES[rangeKey].min;
 let RANGE_MAX_MIDI=RANGES[rangeKey].max;
 
 let MODE="free";
-// HIER toleranter:
-const TOL=45;              // statt 30
+// Toleranz etwas höher
+const TOL=45;
 const SING_MS=4000;
 const PAUSE_MS=3000;
 const COUNT_DELAY_MS=2000;
@@ -187,10 +187,12 @@ const bufLen=2048,buf=new Float32Array(bufLen);
 let challengeRound=0;
 let challengeResults=[];
 
+// Pitch-Hold und Glättung
 let lastPitchHz=null;
 let lastPitchTs=0;
-const PITCH_HOLD_MS=120;
-const COUNT_RMS_MIN=0.004;
+let smoothPitchHz=null;
+const PITCH_HOLD_MS=350; // länger halten
+const COUNT_RMS_MIN=0.003; // fürs ZÄHLEN leicht runter
 
 function snapToTargetOctave(measuredFreq, targetFreq){
   if(!targetFreq || measuredFreq<=0) return measuredFreq;
@@ -346,38 +348,55 @@ function loop(){
   const now=performance.now();
   let f=r.freq, rms=r.rms, fresh=true;
 
+  // Hold länger
   if(f===-1 && lastPitchHz && (now - lastPitchTs) < PITCH_HOLD_MS){
-    f = lastPitchHz; fresh = false;
+    f = lastPitchHz;
+    fresh = false;
   } else if(f !== -1){
-    lastPitchHz = f; lastPitchTs = now;
+    lastPitchHz = f;
+    lastPitchTs = now;
   }
 
   if(f===-1){
-    livePitchEl.textContent="–";liveCentsEl.textContent="–";
-    $("deltaText").textContent="Δ: –";
-    updateCentScale(0);
+    // bei echtem Nichts: aber wenn wir vor <350 ms was hatten, zeigen wir das oben ja schon
+    if(!lastPitchHz || (now - lastPitchTs) >= PITCH_HOLD_MS){
+      livePitchEl.textContent="–";liveCentsEl.textContent="–";
+      $("deltaText").textContent="Δ: –";
+      updateCentScale(0);
+    }
   }else{
+    // Oktave anpassen
     const snapped = currentFreq ? snapToTargetOctave(f, currentFreq) : f;
-    const name=midiToName(freqToMidi(snapped));
-    const cents=currentFreq?(1200*Math.log2(snapped/currentFreq)):0;
-    livePitchEl.textContent=name;
-    liveCentsEl.textContent=snapped.toFixed(1)+" Hz";
-    $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
+
+    // Glätten für Anzeige
+    if(!smoothPitchHz) smoothPitchHz = snapped;
+    else smoothPitchHz = smoothPitchHz * 0.6 + snapped * 0.4;
+
+    const name = midiToName(freqToMidi(smoothPitchHz));
+    const cents = currentFreq ? (1200*Math.log2(smoothPitchHz/currentFreq)) : 0;
+
+    livePitchEl.textContent = name;
+    liveCentsEl.textContent = smoothPitchHz.toFixed(1) + " Hz";
+    $("deltaText").textContent = "Δ: " + (isFinite(cents)?cents.toFixed(0):"–") + " Cent";
 
     const elapsed = singPhase ? (now - singStartTs) : 0;
     const maxCountWindow = SING_MS - COUNT_DELAY_MS;
+
+    // fürs Füllen nehmen wir den UNGEGLÄTTETEN, aber oktaffixierten snapped
+    const fillCents = currentFreq ? (1200*Math.log2(snapped/currentFreq)) : 0;
 
     if(
       fresh &&
       singPhase &&
       elapsed >= COUNT_DELAY_MS &&
       currentFreq &&
-      Math.abs(cents)<=TOL &&     // hier jetzt 45
+      Math.abs(fillCents) <= TOL &&
       rms >= COUNT_RMS_MIN
     ){
       onTargetMs = Math.min(maxCountWindow, onTargetMs + 16);
       setFill(onTargetMs, maxCountWindow);
     }
+
     updateCentScale(cents);
   }
   rafId=requestAnimationFrame(loop);
@@ -434,6 +453,7 @@ function stop(){
   if(gain&&audioCtx)gain.gain.setValueAtTime(0,audioCtx.currentTime);
   menBtn.disabled=false;womenBtn.disabled=false;
   modeFreeBtn.disabled=false;modeChallengeBtn.disabled=false;
+  smoothPitchHz = null;
 }
 startBtn.addEventListener("click",start);
 stopBtn.addEventListener("click",stop);
