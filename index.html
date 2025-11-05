@@ -80,7 +80,7 @@
       <section class="readout">
         <div class="card"><div class="label">Zielton</div><div class="value" id="targetNote">–</div><div class="sub" id="targetFreq">– Hz</div></div>
         <div class="card"><div class="label">Erkannte Tonhöhe</div><div class="value" id="livePitch">–</div><div class="sub" id="liveCents">–</div></div>
-        <div class="card"><div class="label">Trefferquote (letzte Runde)</div><div class="value" id="roundScore">–</div><div class="sub">Zeit innerhalb ±30 Cent (3 s)</div></div>
+        <div class="card"><div class="label">Trefferquote (letzte Runde)</div><div class="value" id="roundScore">–</div><div class="sub">Zeit innerhalb ±30 Cent (2.–4. Sekunde)</div></div>
       </section>
 
       <section class="highway-wrap">
@@ -88,7 +88,7 @@
           <div style="display:flex;align-items:center;gap:10px">
             <span class="status-dot" id="statusDot"></span>
             <div class="legend">
-              <span><span class="dot" style="background:#ffcc66"></span>Ton wird gespielt (3 s)</span>
+              <span><span class="dot" style="background:#ffcc66"></span>Ton wird gespielt (4 s)</span>
               <span><span class="dot" style="background:#3ee079"></span>Pause (3 s)</span>
             </div>
           </div>
@@ -107,9 +107,9 @@
               <line x1="10"  y1="16" x2="10"  y2="24"/>
               <line x1="85"  y1="18" x2="85"  y2="22"/>
               <line x1="160" y1="10" x2="160" y2="30" stroke="#bcd0ff"/>
-              <line x1="235" y1="18" x2="235"  y2="22"/>
-              <line x1="260" y1="16" x2="260"  y2="24"/>
-              <line x1="310" y1="16" x2="310"  y2="24"/>
+              <line x1="235" y1="18" x2="235" y2="22"/>
+              <line x1="260" y1="16" x2="260" y2="24"/>
+              <line x1="310" y1="16" x2="310" y2="24"/>
             </g>
             <g class="scale-label">
               <text x="10"  y="40" text-anchor="middle">-100</text>
@@ -168,6 +168,7 @@ const challengePanel=$("challengePanel"),challengeBody=$("challengeBody"),medalB
 let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
+let singStartTs=0; // neu: für „erst ab Sekunde 2“ zählen
 
 // Männer: C (48) bis c' (60)
 const RANGES={ men:{min:48, max:60}, women:{min:57, max:72} };
@@ -177,7 +178,9 @@ let RANGE_MAX_MIDI=RANGES[rangeKey].max;
 
 let MODE="free";
 const TOL=30;
-const SING_MS=3000, PAUSE_MS=3000;  // hier verkürzt
+const SING_MS=4000;     // 4s Sing/Playback
+const PAUSE_MS=3000;    // 3s Pause
+const COUNT_DELAY_MS=2000; // erst ab 2s füllen
 const bufLen=2048,buf=new Float32Array(bufLen);
 
 let challengeRound=0;
@@ -266,7 +269,9 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
-function pickRandomMidi(){ return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI; }
+function pickRandomMidi(){
+  return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI;
+}
 
 function challengeResetUI(){ challengeBody.innerHTML=""; medalBox.style.display="none"; }
 function challengeAddRow(round,note,score){
@@ -295,10 +300,10 @@ function runFreeRound(){
   targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
   setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase=true;onTargetMs=0;
+  singPhase=true;onTargetMs=0;singStartTs=performance.now();
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
-    roundScoreEl.textContent=Math.round((onTargetMs/SING_MS)*100)+" %";
+    roundScoreEl.textContent=Math.round((onTargetMs/(SING_MS-COUNT_DELAY_MS))*100)+" %";
     cycleTimer=setTimeout(()=>{setStatus("sing");runFreeRound();},PAUSE_MS);
   },SING_MS);
 }
@@ -312,10 +317,10 @@ function runChallengeRound(){
   targetFreqEl.textContent=currentFreq.toFixed(2)+" Hz";
   setStatus("sing");showTargetBar(true,SING_MS);resetFill();
   playTarget(currentFreq,SING_MS);
-  singPhase=true;onTargetMs=0;
+  singPhase=true;onTargetMs=0;singStartTs=performance.now();
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
-    const score=Math.round((onTargetMs/SING_MS)*100);
+    const score=Math.round((onTargetMs/(SING_MS-COUNT_DELAY_MS))*100);
     roundScoreEl.textContent=score+" %";
     challengeResults.push({round:challengeRound,note:midiToName(currentMidi),score});
     challengeAddRow(challengeRound,midiToName(currentMidi),score);
@@ -357,9 +362,17 @@ function loop(){
     liveCentsEl.textContent=snapped.toFixed(1)+" Hz";
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
-    if(fresh && singPhase && currentFreq && Math.abs(cents)<=TOL && rms >= COUNT_RMS_MIN){
-      onTargetMs = Math.min(SING_MS, onTargetMs + 16);
-      setFill(onTargetMs, SING_MS);
+    const elapsed = singPhase ? (now - singStartTs) : 0;
+    if(
+      fresh &&
+      singPhase &&
+      elapsed >= COUNT_DELAY_MS &&              // erst ab 2s
+      currentFreq &&
+      Math.abs(cents)<=TOL &&
+      rms >= COUNT_RMS_MIN
+    ){
+      onTargetMs = Math.min(SING_MS-COUNT_DELAY_MS, onTargetMs + 16);
+      setFill(onTargetMs, SING_MS-COUNT_DELAY_MS);
     }
     updateCentScale(cents);
   }
