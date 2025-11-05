@@ -80,7 +80,7 @@
       <section class="readout">
         <div class="card"><div class="label">Zielton</div><div class="value" id="targetNote">–</div><div class="sub" id="targetFreq">– Hz</div></div>
         <div class="card"><div class="label">Erkannte Tonhöhe</div><div class="value" id="livePitch">–</div><div class="sub" id="liveCents">–</div></div>
-        <div class="card"><div class="label">Trefferquote (letzte Runde)</div><div class="value" id="roundScore">–</div><div class="sub">Zeit innerhalb ±30 Cent (2.–4. Sekunde)</div></div>
+        <div class="card"><div class="label">Trefferquote (letzte Runde)</div><div class="value" id="roundScore">–</div><div class="sub">Zeit innerhalb ±45 Cent (Sek. 2–4)</div></div>
       </section>
 
       <section class="highway-wrap">
@@ -168,7 +168,7 @@ const challengePanel=$("challengePanel"),challengeBody=$("challengeBody"),medalB
 let audioCtx,analyser,micSource,micStream,osc,gain,rafId;
 let singPhase=false,onTargetMs=0,currentMidi=null,currentFreq=null;
 let cycleTimer=null;
-let singStartTs=0; // neu: für „erst ab Sekunde 2“ zählen
+let singStartTs=0;
 
 // Männer: C (48) bis c' (60)
 const RANGES={ men:{min:48, max:60}, women:{min:57, max:72} };
@@ -177,10 +177,11 @@ let RANGE_MIN_MIDI=RANGES[rangeKey].min;
 let RANGE_MAX_MIDI=RANGES[rangeKey].max;
 
 let MODE="free";
-const TOL=30;
-const SING_MS=4000;     // 4s Sing/Playback
-const PAUSE_MS=3000;    // 3s Pause
-const COUNT_DELAY_MS=2000; // erst ab 2s füllen
+// HIER toleranter:
+const TOL=45;              // statt 30
+const SING_MS=4000;
+const PAUSE_MS=3000;
+const COUNT_DELAY_MS=2000;
 const bufLen=2048,buf=new Float32Array(bufLen);
 
 let challengeRound=0;
@@ -269,9 +270,7 @@ function playTarget(freq,durMs=SING_MS){
   gain.gain.linearRampToValueAtTime(0.0,t+durMs/1000);
 }
 
-function pickRandomMidi(){
-  return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI;
-}
+function pickRandomMidi(){ return Math.floor(Math.random()*(RANGE_MAX_MIDI-RANGE_MIN_MIDI+1))+RANGE_MIN_MIDI; }
 
 function challengeResetUI(){ challengeBody.innerHTML=""; medalBox.style.display="none"; }
 function challengeAddRow(round,note,score){
@@ -303,7 +302,9 @@ function runFreeRound(){
   singPhase=true;onTargetMs=0;singStartTs=performance.now();
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
-    roundScoreEl.textContent=Math.round((onTargetMs/(SING_MS-COUNT_DELAY_MS))*100)+" %";
+    const maxCountWindow = SING_MS - COUNT_DELAY_MS;
+    const pct = Math.round((onTargetMs / maxCountWindow) * 100);
+    roundScoreEl.textContent = pct + " %";
     cycleTimer=setTimeout(()=>{setStatus("sing");runFreeRound();},PAUSE_MS);
   },SING_MS);
 }
@@ -320,7 +321,8 @@ function runChallengeRound(){
   singPhase=true;onTargetMs=0;singStartTs=performance.now();
   cycleTimer=setTimeout(()=>{
     singPhase=false;setStatus("play");showTargetBar(false);
-    const score=Math.round((onTargetMs/(SING_MS-COUNT_DELAY_MS))*100);
+    const maxCountWindow = SING_MS - COUNT_DELAY_MS;
+    const score = Math.round((onTargetMs / maxCountWindow) * 100);
     roundScoreEl.textContent=score+" %";
     challengeResults.push({round:challengeRound,note:midiToName(currentMidi),score});
     challengeAddRow(challengeRound,midiToName(currentMidi),score);
@@ -363,16 +365,18 @@ function loop(){
     $("deltaText").textContent="Δ: "+(isFinite(cents)?cents.toFixed(0):"–")+" Cent";
 
     const elapsed = singPhase ? (now - singStartTs) : 0;
+    const maxCountWindow = SING_MS - COUNT_DELAY_MS;
+
     if(
       fresh &&
       singPhase &&
-      elapsed >= COUNT_DELAY_MS &&              // erst ab 2s
+      elapsed >= COUNT_DELAY_MS &&
       currentFreq &&
-      Math.abs(cents)<=TOL &&
+      Math.abs(cents)<=TOL &&     // hier jetzt 45
       rms >= COUNT_RMS_MIN
     ){
-      onTargetMs = Math.min(SING_MS-COUNT_DELAY_MS, onTargetMs + 16);
-      setFill(onTargetMs, SING_MS-COUNT_DELAY_MS);
+      onTargetMs = Math.min(maxCountWindow, onTargetMs + 16);
+      setFill(onTargetMs, maxCountWindow);
     }
     updateCentScale(cents);
   }
@@ -436,4 +440,3 @@ stopBtn.addEventListener("click",stop);
 </script>
 </body>
 </html>
-
